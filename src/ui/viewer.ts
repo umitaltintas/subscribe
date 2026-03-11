@@ -3,7 +3,7 @@ import { esc, truncate, formatDate } from "../utils";
 import { icons } from "../icons";
 import { CONFIG } from "../config";
 import { db } from "../db";
-import { translateTranscript } from "../ai";
+import { translateTranscript, summarizeForUser } from "../ai";
 import {
   showSubtitleOverlay,
   hideSubtitleOverlay,
@@ -67,6 +67,7 @@ export const showTranscriptViewer = (
             ).join("")}
           </select>
           <button class="ytc-btn small" data-action="translate" id="ytc-translate-btn">${icons.translate} Çevir</button>
+          <button class="ytc-btn small" data-action="summarize" id="ytc-summarize-btn">${icons.sparkles} Özetle</button>
           <button class="ytc-btn small secondary" data-action="toggle-subs" id="ytc-subs-btn">${icons.subtitles} Altyazı Göster</button>
           ${hasTranslationBadge ? `<span class="ytc-tag" style="margin-left:auto">${icons.check} Çeviri mevcut: ${translationLangs.map((c) => c.toUpperCase()).join(", ")}</span>` : ""}
         </div>
@@ -170,6 +171,58 @@ export const showTranscriptViewer = (
       } finally {
         translateBtn.disabled = false;
         setHTML(translateBtn, origText);
+      }
+    }
+
+    if (target.closest('[data-action="summarize"]')) {
+      const summarizeBtn = modal.querySelector("#ytc-summarize-btn") as HTMLButtonElement;
+
+      // Check if summary already exists
+      if (currentRecord.userSummary) {
+        const transcriptEl = modal.querySelector("#ytc-viewer-transcript") as HTMLElement;
+        const htmlContent = currentRecord.userSummary
+          .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+          .replace(/^### (.+)$/gm, '<h4 style="margin:12px 0 6px;color:var(--ytc-accent)">$1</h4>')
+          .replace(/^## (.+)$/gm, '<h3 style="margin:14px 0 8px;color:var(--ytc-accent)">$1</h3>')
+          .replace(/^# (.+)$/gm, '<h2 style="margin:16px 0 10px;color:var(--ytc-accent)">$1</h2>')
+          .replace(/^- (.+)$/gm, '<li style="margin:4px 0;margin-left:16px">$1</li>')
+          .replace(/\n/g, "<br>");
+        setHTML(transcriptEl, htmlContent);
+        showToast("Mevcut özet gösteriliyor");
+        return;
+      }
+
+      const settings = db.getAISettings();
+      if (!settings?.apiKey) {
+        showToast("Lütfen önce AI ayarlarını yapılandırın", "error");
+        return;
+      }
+
+      summarizeBtn.disabled = true;
+      const origText = summarizeBtn.innerHTML;
+
+      try {
+        setHTML(summarizeBtn, `${icons.sparkles} Özetleniyor...`);
+        const summary = await summarizeForUser(currentRecord.transcript, settings);
+
+        await db.update(currentRecord.id, { userSummary: summary });
+        currentRecord = { ...currentRecord, userSummary: summary };
+
+        const transcriptEl = modal.querySelector("#ytc-viewer-transcript") as HTMLElement;
+        const htmlContent = summary
+          .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+          .replace(/^### (.+)$/gm, '<h4 style="margin:12px 0 6px;color:var(--ytc-accent)">$1</h4>')
+          .replace(/^## (.+)$/gm, '<h3 style="margin:14px 0 8px;color:var(--ytc-accent)">$1</h3>')
+          .replace(/^# (.+)$/gm, '<h2 style="margin:16px 0 10px;color:var(--ytc-accent)">$1</h2>')
+          .replace(/^- (.+)$/gm, '<li style="margin:4px 0;margin-left:16px">$1</li>')
+          .replace(/\n/g, "<br>");
+        setHTML(transcriptEl, htmlContent);
+        showToast("Özet hazır!");
+      } catch (err) {
+        showToast("Özet hatası: " + (err as Error).message, "error");
+      } finally {
+        summarizeBtn.disabled = false;
+        setHTML(summarizeBtn, origText);
       }
     }
 

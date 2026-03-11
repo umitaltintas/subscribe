@@ -224,6 +224,58 @@ const cleanTranscript = (text: string): string => {
     .join("\n");
 };
 
+export const summarizeForUser = async (
+  transcript: string,
+  settings: AISettings,
+  onProgress?: (stage: string) => void,
+): Promise<string> => {
+  onProgress?.("analyzing");
+  const cleaned = cleanTranscript(transcript);
+
+  const response = await fetch(CONFIG.AI.OPENROUTER_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${settings.apiKey}`,
+      "Content-Type": "application/json",
+      "HTTP-Referer": window.location.href,
+    },
+    body: JSON.stringify({
+      model: settings.model,
+      messages: [
+        {
+          role: "system",
+          content: `You are a skilled content analyst. Summarize the following video transcript in the same language as the transcript.
+
+Your summary should include:
+1. **Ana Konu**: A one-line description of what the video is about
+2. **Önemli Noktalar**: Key points and takeaways (bullet points)
+3. **Sonuç**: Brief conclusion or final thoughts
+
+Keep it concise but informative. Use markdown-style formatting with headers and bullet points.
+Output ONLY the summary. No meta-commentary.`,
+        },
+        {
+          role: "user",
+          content: cleaned,
+        },
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.text().catch(() => "Unknown error");
+    throw new Error(`API error (${response.status}): ${errorBody}`);
+  }
+
+  const data = await response.json();
+
+  if (!data.choices?.[0]?.message?.content) {
+    throw new Error("API returned an empty response");
+  }
+
+  return data.choices[0].message.content;
+};
+
 export const translateTranscript = async (
   transcript: string,
   targetLang: string,

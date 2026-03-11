@@ -1,7 +1,7 @@
 {
   "name": "subscribe-userscript",
   "version": "1.0.0",
-  "description": "YouTube transcript manager userscript with fuzzy search, AI translation, and subtitle overlay",
+  "description": "YouTube transcript manager userscript with fuzzy search, AI translation, AI summarization, and subtitle overlay",
   "author": "umitaltintas",
   "license": "MIT",
   "repository": {
@@ -15,6 +15,7 @@
     "tampermonkey",
     "subtitle",
     "translation",
+    "summarization",
     "ai",
     "openrouter",
     "fuse.js"
@@ -32,6 +33,7 @@
   },
   "dependencies": {
     "@typescript/native-preview": "^7.0.0-dev.20260310.1",
-    "fuse.js": "^7.1.0"
+    "fuse.js": "^7.1.0",
+    "lucide-static": "^0.577.0"
   }
 }

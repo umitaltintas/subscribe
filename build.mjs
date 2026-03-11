@@ -4,7 +4,7 @@ const USERSCRIPT_HEADER = `// ==UserScript==
 // @name         SubScribe - YouTube Transcript Manager
 // @namespace    http://tampermonkey.net/
 // @version      1.0.0
-// @description  YouTube transcript manager with fuzzy search, AI translation, and subtitle overlay
+// @description  YouTube transcript manager with fuzzy search, AI translation, AI summarization, and subtitle overlay
 // @author       umitaltintas
 // @homepage     https://github.com/umitaltintas/subscribe
 // @match        https://www.youtube.com/*

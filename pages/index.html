@@ -4,9 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SubScribe — YouTube Transcript Manager</title>
-  <meta name="description" content="Extract, search, translate, and overlay YouTube transcripts. Powered by AI, stored locally.">
+  <meta name="description" content="Extract, search, translate, summarize, and overlay YouTube transcripts. Powered by AI, stored locally.">
   <meta property="og:title" content="SubScribe — YouTube Transcript Manager">
-  <meta property="og:description" content="Extract, search, translate, and overlay YouTube transcripts with AI-powered tools.">
+  <meta property="og:description" content="Extract, search, translate, summarize, and overlay YouTube transcripts with AI-powered tools.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://umitaltintas.github.io/subscribe/">
   <meta property="og:image" content="https://umitaltintas.github.io/subscribe/og-image.svg">
@@ -931,6 +931,7 @@
       <div class="float-card">&#9654; transcript.extract()</div>
       <div class="float-card">&#128269; fuzzy.search("quantum")</div>
       <div class="float-card">&#127760; ai.translate("ja")</div>
+      <div class="float-card">&#10024; ai.summarize()</div>
       <div class="float-card">&#128190; db.save(transcript)</div>
     </div>
     <div class="hero-content">
@@ -939,7 +940,7 @@
         v1.0.0 — Tampermonkey Userscript
       </div>
       <h1>YouTube Transcripts,<br><span class="accent">Supercharged</span></h1>
-      <p class="hero-sub">Extract, search, translate, and overlay transcripts on any YouTube video. AI-powered. Locally stored. Zero accounts needed.</p>
+      <p class="hero-sub">Extract, search, translate, summarize, and overlay transcripts on any YouTube video. AI-powered. Locally stored. Zero accounts needed.</p>
       <div class="hero-actions">
         <a href="subscribe.user.js" class="btn btn-primary">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -1011,6 +1012,7 @@
         <div class="subscribe-actions">
           <div class="sub-btn sub-btn-transcript" id="btnTranscript"><span class="sub-btn-icon">&#9776;</span> Transcript <span class="sub-btn-badge">42 seg</span></div>
           <div class="sub-btn sub-btn-translate" id="btnTranslate"><span class="sub-btn-icon">&#127760;</span> Translate <span class="sub-btn-badge">EN</span></div>
+          <div class="sub-btn sub-btn-translate" id="btnSummarize"><span class="sub-btn-icon">&#10024;</span> Summarize</div>
         </div>
         <div class="video-meta">
           <div class="video-meta-title">Understanding Neural Networks: A Visual Guide</div>
@@ -1052,6 +1054,8 @@
       <span class="phase-arrow">&#8594;</span>
       <div class="phase-step" data-phase="translate"><span class="phase-dot"></span> Translate</div>
       <span class="phase-arrow">&#8594;</span>
+      <div class="phase-step" data-phase="summarize"><span class="phase-dot"></span> Summarize</div>
+      <span class="phase-arrow">&#8594;</span>
       <div class="phase-step" data-phase="overlay"><span class="phase-dot"></span> Overlay</div>
     </div>
   </section>
@@ -1083,6 +1087,12 @@
           <h3>AI Translation</h3>
           <p>Translate into 10+ languages via OpenRouter. Supports Gemini, Claude, GPT, and more.</p>
           <span class="feature-tag">openrouter</span>
+        </div>
+        <div class="feature-card reveal reveal-delay-3">
+          <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/></svg></div>
+          <h3>AI Summarization</h3>
+          <p>Get instant summaries of any video. Key points, main topics, and conclusions — all with one click.</p>
+          <span class="feature-tag">AI-powered</span>
         </div>
         <div class="feature-card reveal reveal-delay-4">
           <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div>
@@ -1210,11 +1220,11 @@
         </div>
         <div class="faq-item">
           <button class="faq-trigger" aria-expanded="false"><span>Is it free?</span><svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
-          <div class="faq-content"><div class="faq-answer"><p>Completely free and open-source under the MIT license. The only potential cost is if you use AI translation via OpenRouter, which has its own pricing.</p></div></div>
+          <div class="faq-content"><div class="faq-answer"><p>Completely free and open-source under the MIT license. The only potential cost is if you use AI translation or summarization via OpenRouter, which has its own pricing.</p></div></div>
         </div>
         <div class="faq-item">
           <button class="faq-trigger" aria-expanded="false"><span>Do I need an API key?</span><svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
-          <div class="faq-content"><div class="faq-answer"><p>Only for AI translation. Basic features like transcript extraction, search, and the library work without any API key. For translation, you'll need a free OpenRouter API key.</p></div></div>
+          <div class="faq-content"><div class="faq-answer"><p>Only for AI features (translation and summarization). Basic features like transcript extraction, search, and the library work without any API key. For AI features, you'll need a free OpenRouter API key.</p></div></div>
         </div>
         <div class="faq-item">
           <button class="faq-trigger" aria-expanded="false"><span>Which browsers are supported?</span><svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
@@ -1405,7 +1415,7 @@
 
       function phase0() {
         setPhase('extract'); reset();
-        btnTranscript.classList.add('active'); btnTranslate.classList.remove('active');
+        btnTranscript.classList.add('active'); btnTranslate.classList.remove('active'); btnSummarize.classList.remove('active');
         tabTranscript.classList.add('active'); tabTranslation.classList.remove('active');
         searchInput.classList.remove('active'); searchInput.value='';
         statusText.textContent='42 segments \u00b7 synced';
@@ -1422,14 +1432,46 @@
         });
         setTimeout(()=>{ entries.forEach(e=>{e.style.opacity='';}); searchInput.classList.remove('active'); phase2(); }, DUR);
       }
+      const btnSummarize = document.getElementById('btnSummarize');
+
       function phase2() {
         setPhase('translate'); reset(); searchInput.value='';
-        btnTranslate.classList.add('active'); tabTranscript.classList.remove('active'); tabTranslation.classList.add('active');
+        btnTranslate.classList.add('active'); btnSummarize.classList.remove('active'); tabTranscript.classList.remove('active'); tabTranslation.classList.add('active');
         statusText.textContent='translating...';
         const tr=['Una red neuronal es una serie de algoritmos que reconocen patrones.','Cada capa transforma los datos, aprendiendo representaciones abstractas.','El algoritmo de retropropagacion ajusta los pesos para minimizar errores.','El descenso de gradiente es como hacer rodar una pelota por una colina.','Las funciones de activacion introducen no linealidad.','Las capas convolucionales son potentes para reconocimiento de imagenes.','El dropout previene el sobreajuste durante el entrenamiento.'];
         let i=0; const iv=setInterval(()=>{ if(i<entries.length){ const t=entries[i].querySelector('.entry-text'); t.style.transition='opacity 0.3s'; t.style.opacity='0'; const ci=i; setTimeout(()=>{t.textContent=tr[ci];t.style.opacity='1';},300); i++; } },350);
         setTimeout(()=>{ statusText.textContent='42 segments \u00b7 ES'; },2800);
-        setTimeout(()=>{ clearInterval(iv); entries.forEach(e=>{const t=e.querySelector('.entry-text');t.style.transition='';t.style.opacity='';}); phase3(); }, DUR);
+        setTimeout(()=>{ clearInterval(iv); entries.forEach(e=>{const t=e.querySelector('.entry-text');t.style.transition='';t.style.opacity='';}); phaseSummarize(); }, DUR);
+      }
+      function phaseSummarize() {
+        setPhase('summarize'); reset(); searchInput.value='';
+        btnTranslate.classList.remove('active'); btnSummarize.classList.add('active');
+        tabTranscript.classList.add('active'); tabTranslation.classList.remove('active');
+        statusText.textContent='summarizing...';
+        subtitleEl.classList.remove('visible');
+        const summaryLines = [
+          {bold: true, text: 'Main Topic'},
+          {bold: false, text: 'A visual introduction to neural networks and deep learning fundamentals.'},
+          {bold: true, text: 'Key Points'},
+          {bold: false, text: '\u2022 Neural networks recognize patterns through layered data transformation'},
+          {bold: false, text: '\u2022 Backpropagation minimizes prediction errors via gradient descent'},
+          {bold: false, text: '\u2022 CNNs excel at image recognition; dropout prevents overfitting'},
+        ];
+        entries.forEach(e => { e.style.transition='opacity 0.3s'; e.style.opacity='0'; });
+        setTimeout(()=>{
+          entries.forEach((e,i) => {
+            if (i < summaryLines.length) {
+              const t = e.querySelector('.entry-text');
+              const tm = e.querySelector('.entry-time');
+              tm.textContent = summaryLines[i].bold ? '\u2728' : '';
+              t.innerHTML = summaryLines[i].bold ? '<strong style="color:var(--red)">' + summaryLines[i].text + '</strong>' : summaryLines[i].text;
+              e.style.opacity = '1';
+              e.classList.remove('active');
+            } else { e.style.display = 'none'; }
+          });
+          statusText.textContent='summary ready \u00b7 AI';
+        }, 500);
+        setTimeout(()=>{ entries.forEach(e=>{e.style.transition='';e.style.opacity='';e.style.display='';}); btnSummarize.classList.remove('active'); phase3(); }, DUR);
       }
       function phase3() {
         setPhase('overlay'); reset(); searchInput.value='';

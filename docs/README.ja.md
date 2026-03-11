@@ -4,7 +4,7 @@
 [![Release](https://img.shields.io/github/v/release/umitaltintas/subscribe)](https://github.com/umitaltintas/subscribe/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](../LICENSE)
 
-ファジー検索、AI翻訳、リアルタイム字幕オーバーレイを備えた強力なYouTubeトランスクリプト管理ユーザースクリプト。
+ファジー検索、AI翻訳・要約、リアルタイム字幕オーバーレイを備えた強力なYouTubeトランスクリプト管理ユーザースクリプト。
 
 **[English](../README.md)** | **[Turkce](README.tr.md)** | **[Deutsch](README.de.md)** | **[Espanol](README.es.md)**
 
@@ -13,6 +13,7 @@
 - **ワンクリックトランスクリプト抽出** — YouTubeビデオのトランスクリプトをタイムスタンプ付き・なしで取得
 - **ファジー検索** — [Fuse.js](https://www.fusejs.io/)によるタイトル、チャンネル、タグ、トランスクリプト内容のタイポ許容検索
 - **AI翻訳** — [OpenRouter](https://openrouter.ai/)経由で10以上の言語に翻訳（Gemini、Claude、GPTなど全モデル対応）
+- **AI要約** — ワンクリックでビデオの要約を生成：主要トピック、重要ポイント、結論
 - **字幕オーバーレイ** — 翻訳された字幕をYouTubeビデオプレーヤー上にリアルタイム表示
 - **トランスクリプトライブラリ** — 全トランスクリプトをIndexedDBにローカル保存：お気に入り、タグ、統計情報
 - **ダッシュボード** — 履歴、お気に入り、翻訳、統計、データのエクスポート/インポート
@@ -53,6 +54,7 @@ bun run typecheck  # TypeScript型チェック
 ### ビデオページ
 - **トランスクリプト**ボタン — 現在のビデオのトランスクリプトを抽出して保存
 - **翻訳**ボタン — トランスクリプトを翻訳してビデオ上に字幕を表示
+- **要約**ボタン — ビデオ内容のAI要約を生成
 
 ### ダッシュボードタブ
 

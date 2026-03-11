@@ -4,7 +4,7 @@
 [![Release](https://img.shields.io/github/v/release/umitaltintas/subscribe)](https://github.com/umitaltintas/subscribe/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](../LICENSE)
 
-Un potente userscript de gestion de transcripciones de YouTube con busqueda difusa, traduccion con IA y superposicion de subtitulos en tiempo real.
+Un potente userscript de gestion de transcripciones de YouTube con busqueda difusa, traduccion y resumen con IA, y superposicion de subtitulos en tiempo real.
 
 **[English](../README.md)** | **[Turkce](README.tr.md)** | **[Deutsch](README.de.md)** | **[日本語](README.ja.md)**
 
@@ -13,6 +13,7 @@ Un potente userscript de gestion de transcripciones de YouTube con busqueda difu
 - **Extraccion de transcripciones con un clic** — Obten la transcripcion de cualquier video de YouTube con o sin marcas de tiempo
 - **Busqueda difusa** — Con [Fuse.js](https://www.fusejs.io/), busca en titulos, canales, etiquetas y contenido de transcripciones con tolerancia a errores tipograficos
 - **Traduccion con IA** — Traduce transcripciones a mas de 10 idiomas a traves de [OpenRouter](https://openrouter.ai/) (soporta cualquier modelo: Gemini, Claude, GPT, etc.)
+- **Resumen con IA** — Resumenes instantaneos de videos con tema principal, puntos clave y conclusiones con un solo clic
 - **Superposicion de subtitulos** — Muestra subtitulos traducidos directamente en el reproductor de YouTube en tiempo real
 - **Biblioteca de transcripciones** — Todas las transcripciones se almacenan localmente en IndexedDB con favoritos, etiquetas y estadisticas
 - **Panel de control** — Interfaz completa con historial, favoritos, traducciones, estadisticas y exportacion/importacion de datos
@@ -53,6 +54,7 @@ Una vez instalado, veras nuevos botones en YouTube:
 ### Pagina del video
 - **Transcripcion** — Extrae y guarda la transcripcion del video actual
 - **Traducir** — Traduce la transcripcion y muestra subtitulos sobre el video
+- **Resumir** — Genera un resumen del contenido del video con IA
 
 ### Pestanas del panel
 

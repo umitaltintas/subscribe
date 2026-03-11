@@ -4,7 +4,7 @@
 [![Release](https://img.shields.io/github/v/release/umitaltintas/subscribe)](https://github.com/umitaltintas/subscribe/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](../LICENSE)
 
-Ein leistungsstarkes YouTube-Transkript-Manager-Userscript mit unscharfer Suche, KI-gestutzter Ubersetzung und Echtzeit-Untertitel-Overlay.
+Ein leistungsstarkes YouTube-Transkript-Manager-Userscript mit unscharfer Suche, KI-gestutzter Ubersetzung & Zusammenfassung und Echtzeit-Untertitel-Overlay.
 
 **[English](../README.md)** | **[Turkce](README.tr.md)** | **[Espanol](README.es.md)** | **[日本語](README.ja.md)**
 
@@ -13,6 +13,7 @@ Ein leistungsstarkes YouTube-Transkript-Manager-Userscript mit unscharfer Suche,
 - **Ein-Klick-Transkript-Extraktion** — Transkript jedes YouTube-Videos mit oder ohne Zeitstempel abrufen
 - **Unscharfe Suche** — Mit [Fuse.js](https://www.fusejs.io/) uber Titel, Kanale, Tags und Transkriptinhalte mit Tippfehlertoleranz suchen
 - **KI-Ubersetzung** — Transkripte in uber 10 Sprachen uber [OpenRouter](https://openrouter.ai/) ubersetzen (unterstutzt alle Modelle: Gemini, Claude, GPT usw.)
+- **KI-Zusammenfassung** — Sofortige Video-Zusammenfassungen mit Hauptthema, wichtigen Punkten und Schlussfolgerungen per Klick
 - **Untertitel-Overlay** — Ubersetzte Untertitel direkt im YouTube-Videoplayer in Echtzeit anzeigen
 - **Transkript-Bibliothek** — Alle Transkripte werden lokal in IndexedDB gespeichert: Favoriten, Tags, Statistiken
 - **Dashboard** — Verwaltungsoberflache mit Verlauf, Favoriten, Ubersetzungen, Statistiken und Datenexport/-import
@@ -53,6 +54,7 @@ Nach der Installation erscheinen neue Schaltflachen auf YouTube:
 ### Videoseite
 - **Transkript**-Schaltflache — Transkript des aktuellen Videos extrahieren und speichern
 - **Ubersetzen**-Schaltflache — Transkript ubersetzen und Untertitel auf dem Video anzeigen
+- **Zusammenfassen**-Schaltflache — KI-Zusammenfassung des Videoinhalts erstellen
 
 ### Dashboard-Tabs
 

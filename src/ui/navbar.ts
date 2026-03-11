@@ -3,7 +3,7 @@ import { sleep } from "../utils";
 import { icons } from "../icons";
 import { db } from "../db";
 import { openTranscript, getTranscriptText, getVideoInfo } from "../transcript";
-import { translateTranscript, getLastTranslationUsage } from "../ai";
+import { translateTranscript, getLastTranslationUsage, summarizeForUser } from "../ai";
 import { showSubtitleOverlay, hideSubtitleOverlay, isOverlayActive, parseCuesFromTranslatedText } from "../subtitle-overlay";
 
 type ModalOpener = () => void;
@@ -79,6 +79,55 @@ export const injectNavbarButton = (): void => {
   }
 
   updateNavbarBadge();
+};
+
+const showSummaryModal = (summary: string): void => {
+  ($(".ytc-summary-modal") as HTMLElement)?.remove();
+
+  const modal = document.createElement("div");
+  modal.className = "ytc-modal-bg ytc-summary-modal";
+
+  // Convert basic markdown to HTML
+  const htmlContent = summary
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/^### (.+)$/gm, '<h4 style="margin:12px 0 6px;color:var(--ytc-accent)">$1</h4>')
+    .replace(/^## (.+)$/gm, '<h3 style="margin:14px 0 8px;color:var(--ytc-accent)">$1</h3>')
+    .replace(/^# (.+)$/gm, '<h2 style="margin:16px 0 10px;color:var(--ytc-accent)">$1</h2>')
+    .replace(/^- (.+)$/gm, '<li style="margin:4px 0;margin-left:16px">$1</li>')
+    .replace(/\n/g, "<br>");
+
+  setHTML(modal, `
+    <div class="ytc-modal" style="width:min(600px,95vw)">
+      <div class="ytc-modal-header">
+        <h2>${icons.sparkles} Video Özeti</h2>
+        <button class="ytc-modal-close">${icons.x}</button>
+      </div>
+      <div class="ytc-modal-body" style="padding:20px;line-height:1.7;max-height:60vh;overflow-y:auto">
+        ${htmlContent}
+      </div>
+      <div class="ytc-modal-footer">
+        <button class="ytc-btn" data-action="copy-summary">${icons.clipboard} Kopyala</button>
+      </div>
+    </div>
+  `);
+
+  document.body.appendChild(modal);
+
+  modal.addEventListener("click", (e) => {
+    const target = e.target as HTMLElement;
+    if (target === modal || target.closest(".ytc-modal-close")) modal.remove();
+    if (target.closest('[data-action="copy-summary"]')) {
+      GM_setClipboard(summary);
+      showToast("Özet kopyalandı!");
+    }
+  });
+
+  document.addEventListener("keydown", function handler(e) {
+    if (e.key === "Escape") {
+      modal.remove();
+      document.removeEventListener("keydown", handler);
+    }
+  });
 };
 
 export const injectVideoButton = (): void => {
@@ -252,10 +301,104 @@ export const injectVideoButton = (): void => {
 
     owner.appendChild(translateBtn);
   }
+
+  // Summarize button
+  if (!$("#ytc-summarize-video-btn")) {
+    const summarizeBtn = document.createElement("button");
+    summarizeBtn.id = "ytc-summarize-video-btn";
+    summarizeBtn.className = "ytc-btn";
+    setHTML(summarizeBtn, `${icons.sparkles} Özetle`);
+
+    let summarizing = false;
+
+    summarizeBtn.onclick = async () => {
+      const settings = db.getAISettings();
+      if (!settings?.apiKey) {
+        showToast("Lütfen önce AI ayarlarını yapılandırın", "error");
+        settingsOpener?.();
+        return;
+      }
+
+      if (summarizing) return;
+      summarizing = true;
+      setHTML(summarizeBtn, `${icons.sparkles} Özetleniyor...`);
+
+      // Check DB for existing summary
+      const videoId = getVideoInfo().id;
+      if (videoId) {
+        const record = await db.get(videoId);
+        if (record?.userSummary) {
+          showSummaryModal(record.userSummary);
+          summarizing = false;
+          setHTML(summarizeBtn, `${icons.sparkles} Özetle`);
+          return;
+        }
+      }
+
+      const opened = await openTranscript();
+      if (!opened) {
+        summarizing = false;
+        setHTML(summarizeBtn, `${icons.sparkles} Özetle`);
+        return showToast("Transkript bulunamadı", "error");
+      }
+
+      let transcript = "";
+      for (let attempt = 0; attempt < 10; attempt++) {
+        await sleep(500);
+        transcript = getTranscriptText(true);
+        if (transcript) break;
+      }
+
+      if (!transcript) {
+        summarizing = false;
+        setHTML(summarizeBtn, `${icons.sparkles} Özetle`);
+        return showToast("Transkript yüklenemedi", "error");
+      }
+
+      try {
+        const summary = await summarizeForUser(transcript, settings, () => {
+          setHTML(summarizeBtn, `${icons.sparkles} Analiz ediliyor...`);
+        });
+
+        // Save to DB
+        if (videoId) {
+          try {
+            const existing = await db.get(videoId);
+            if (!existing) {
+              const info = getVideoInfo();
+              await db.add({
+                id: videoId,
+                url: info.url,
+                title: info.title,
+                channel: info.channel,
+                transcript,
+                tokens: Math.ceil(transcript.length / 4),
+                words: transcript.split(/\s+/).length,
+                userSummary: summary,
+              });
+            } else {
+              await db.update(videoId, { userSummary: summary });
+            }
+          } catch {}
+        }
+
+        showSummaryModal(summary);
+        showToast("Özet hazır!");
+      } catch (err) {
+        showToast("Özet hatası: " + (err as Error).message, "error");
+      } finally {
+        summarizing = false;
+        setHTML(summarizeBtn, `${icons.sparkles} Özetle`);
+      }
+    };
+
+    owner.appendChild(summarizeBtn);
+  }
 };
 
 export const cleanupVideoButton = (): void => {
   ($("#ytc-copy-btn") as HTMLElement)?.remove();
   ($("#ytc-translate-video-btn") as HTMLElement)?.remove();
+  ($("#ytc-summarize-video-btn") as HTMLElement)?.remove();
   if (isOverlayActive()) hideSubtitleOverlay();
 };

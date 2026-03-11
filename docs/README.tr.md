@@ -4,7 +4,7 @@
 [![Release](https://img.shields.io/github/v/release/umitaltintas/subscribe)](https://github.com/umitaltintas/subscribe/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](../LICENSE)
 
-YouTube transkript yoneticisi — fuzzy arama, yapay zeka destekli ceviri ve gercek zamanli altyazi ozellikleriyle.
+YouTube transkript yoneticisi — fuzzy arama, yapay zeka destekli ceviri & ozetleme ve gercek zamanli altyazi ozellikleriyle.
 
 **[English](../README.md)** | **[Deutsch](README.de.md)** | **[Espanol](README.es.md)** | **[日本語](README.ja.md)**
 
@@ -13,6 +13,7 @@ YouTube transkript yoneticisi — fuzzy arama, yapay zeka destekli ceviri ve ger
 - **Tek Tikla Transkript Cikarma** — Herhangi bir YouTube videosunun transkriptini zaman damgali veya damgasiz olarak alin
 - **Fuzzy Arama** — [Fuse.js](https://www.fusejs.io/) ile baslik, kanal, etiket ve transkript icinde yazim hatalarini tolere eden arama
 - **Yapay Zeka Cevirisi** — [OpenRouter](https://openrouter.ai/) uzerinden 10'dan fazla dile ceviri (Gemini, Claude, GPT vb. tum modeller desteklenir)
+- **Yapay Zeka Ozetleme** — Tek tikla video ozetleri: ana konu, onemli noktalar ve sonuclar
 - **Altyazi Kaplama** — Cevrilen altyazilari YouTube video oynaticisinda gercek zamanli goruntuleyin
 - **Transkript Kutuphanesi** — Tum transkriptler IndexedDB'de yerel olarak saklanir: favoriler, etiketler, istatistikler
 - **Yonetim Paneli** — Gecmis, favoriler, ceviriler, istatistikler ve veri disa/ice aktarma
@@ -53,6 +54,7 @@ Kurduktan sonra YouTube'da yeni butonlar goreceksiniz:
 ### Video Sayfasi
 - **Transkript** butonu — Videonun transkriptini cikarir ve kaydeder
 - **Cevir** butonu — Transkripti cevirir ve video uzerinde altyazi gosterir
+- **Ozetle** butonu — Videonun yapay zeka ile ozetini olusturur
 
 ### Panel Sekmeleri
 
@@ -77,7 +79,7 @@ Kurduktan sonra YouTube'da yeni butonlar goreceksiniz:
 - **esbuild** — Tek IIFE userscript'e hizli paketleme
 - **Fuse.js** — Istemci tarafli fuzzy arama motoru
 - **IndexedDB** — Yerel depolama (sunucu yok, hesap yok)
-- **OpenRouter API** — Coklu model destekli yapay zeka cevirisi
+- **OpenRouter API** — Coklu model destekli yapay zeka cevirisi ve ozetleme
 - **Trusted Types** — CSP uyumlu DOM manipulasyonu
 
 ## Katki

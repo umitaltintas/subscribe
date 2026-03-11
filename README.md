@@ -4,7 +4,7 @@
 [![Release](https://img.shields.io/github/v/release/umitaltintas/subscribe)](https://github.com/umitaltintas/subscribe/releases/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-A powerful YouTube transcript manager userscript with fuzzy search, AI-powered translation, and real-time subtitle overlay.
+A powerful YouTube transcript manager userscript with fuzzy search, AI-powered translation & summarization, and real-time subtitle overlay.
 
 **[Turkce](docs/README.tr.md)** | **[Deutsch](docs/README.de.md)** | **[Espanol](docs/README.es.md)** | **[日本語](docs/README.ja.md)**
 
@@ -13,6 +13,7 @@ A powerful YouTube transcript manager userscript with fuzzy search, AI-powered t
 - **One-Click Transcript Extraction** — Grab any YouTube video's transcript with or without timestamps
 - **Fuzzy Search** — Powered by [Fuse.js](https://www.fusejs.io/), searches across titles, channels, tags, and transcript content with typo tolerance
 - **AI Translation** — Translate transcripts into 10+ languages via [OpenRouter](https://openrouter.ai/) (supports any model: Gemini, Claude, GPT, etc.)
+- **AI Summarization** — Get instant video summaries with key points, main topics, and conclusions in one click
 - **Subtitle Overlay** — Display translated subtitles directly on the YouTube video player in real-time
 - **Transcript Library** — All transcripts are stored locally in IndexedDB with favorites, tags, and stats
 - **Dashboard** — Full management UI with history, favorites, translations tab, stats, and data export/import
@@ -53,6 +54,7 @@ Once installed, you'll see new buttons on YouTube:
 ### Video Page
 - **Transcript** button — Extract and save the current video's transcript
 - **Translate** button — Translate the transcript and show subtitles on the video
+- **Summarize** button — Generate an AI summary of the video's content
 
 ### Dashboard Tabs
 
@@ -77,7 +79,7 @@ Once installed, you'll see new buttons on YouTube:
 - **esbuild** — Fast bundling into a single IIFE userscript
 - **Fuse.js** — Client-side fuzzy search engine
 - **IndexedDB** — Local storage for transcripts (no server, no accounts)
-- **OpenRouter API** — Multi-model AI translation with cost tracking
+- **OpenRouter API** — Multi-model AI translation & summarization with cost tracking
 - **Trusted Types** — CSP-compatible DOM manipulation
 
 ## Project Structure
@@ -90,7 +92,7 @@ src/
 ├── db.ts                 # IndexedDB wrapper (TranscriptDB)
 ├── transcript.ts         # YouTube DOM transcript extraction
 ├── search.ts             # Fuse.js search manager
-├── ai.ts                 # OpenRouter translation logic
+├── ai.ts                 # OpenRouter translation & summarization logic
 ├── subtitle-overlay.ts   # Real-time subtitle display on video
 ├── router.ts             # YouTube SPA navigation handler
 ├── dom.ts                # DOM utilities and CSS injection
