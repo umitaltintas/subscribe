@@ -1,0 +1,1452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SubScribe — YouTube Transcript Manager</title>
+  <meta name="description" content="Extract, search, translate, and overlay YouTube transcripts. Powered by AI, stored locally.">
+  <meta property="og:title" content="SubScribe — YouTube Transcript Manager">
+  <meta property="og:description" content="Extract, search, translate, and overlay YouTube transcripts with AI-powered tools.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://umitaltintas.github.io/subscribe/">
+  <meta property="og:image" content="https://umitaltintas.github.io/subscribe/og-image.svg">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📜</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    /* ═══════════════════════════════════════
+       RESET & VARIABLES
+       ═══════════════════════════════════════ */
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --black: #050505;
+      --surface: #0c0c0c;
+      --surface-2: #141414;
+      --surface-3: #1a1a1a;
+      --border: #222;
+      --border-light: #333;
+      --text: #e8e8e8;
+      --text-dim: #888;
+      --text-muted: #555;
+      --red: #FF0033;
+      --red-dark: #CC0029;
+      --red-glow: rgba(255, 0, 51, 0.15);
+      --red-glow-strong: rgba(255, 0, 51, 0.35);
+      --font-display: 'Plus Jakarta Sans', sans-serif;
+      --font-body: 'Plus Jakarta Sans', sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    html {
+      scroll-behavior: smooth;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border-light) var(--black);
+    }
+
+    body {
+      font-family: var(--font-body);
+      background: var(--black);
+      color: var(--text);
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+      line-height: 1.6;
+    }
+
+    /* Noise grain overlay */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 9999;
+      opacity: 0.03;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      background-repeat: repeat;
+      background-size: 200px;
+    }
+
+    /* ═══════════════════════════════════════
+       SCROLL REVEAL SYSTEM
+       ═══════════════════════════════════════ */
+    .reveal {
+      opacity: 0;
+      transform: translateY(40px);
+      transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1),
+                  transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .reveal.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .reveal-delay-1 { transition-delay: 0.1s; }
+    .reveal-delay-2 { transition-delay: 0.2s; }
+    .reveal-delay-3 { transition-delay: 0.3s; }
+    .reveal-delay-4 { transition-delay: 0.4s; }
+    .reveal-delay-5 { transition-delay: 0.5s; }
+    .reveal-delay-6 { transition-delay: 0.6s; }
+
+    /* ═══════════════════════════════════════
+       NAVIGATION
+       ═══════════════════════════════════════ */
+    nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 100;
+      padding: 1.25rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      background: rgba(5, 5, 5, 0.7);
+      border-bottom: 1px solid transparent;
+      transition: border-color 0.3s, background 0.3s;
+    }
+    nav.scrolled {
+      border-bottom-color: var(--border);
+      background: rgba(5, 5, 5, 0.9);
+    }
+    .nav-brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      text-decoration: none;
+      color: var(--text);
+    }
+    .nav-logo { width: 32px; height: 32px; }
+    .nav-name {
+      font-family: var(--font-display);
+      font-weight: 800;
+      font-size: 1.2rem;
+      letter-spacing: -0.02em;
+    }
+    .nav-name span { color: var(--red); }
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 2rem;
+      list-style: none;
+    }
+    .nav-links a {
+      color: var(--text-dim);
+      text-decoration: none;
+      font-size: 0.875rem;
+      font-weight: 500;
+      letter-spacing: 0.02em;
+      transition: color 0.2s;
+    }
+    .nav-links a:hover { color: var(--text); }
+    .nav-cta {
+      background: var(--red) !important;
+      color: #fff !important;
+      padding: 0.5rem 1.25rem;
+      border-radius: 8px;
+      font-weight: 600 !important;
+      transition: background 0.2s, transform 0.2s !important;
+    }
+    .nav-cta:hover {
+      background: var(--red-dark) !important;
+      transform: translateY(-1px);
+    }
+
+    /* GitHub Stars Badge */
+    .gh-stars-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin-left: 6px;
+      padding: 2px 10px;
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      vertical-align: middle;
+      transition: color 0.2s, border-color 0.2s;
+    }
+    .gh-stars-badge:hover { color: var(--text); border-color: var(--border-light); }
+    .gh-stars-badge[data-state="hidden"] { display: none; }
+
+    /* ═══════════════════════════════════════
+       HAMBURGER + MOBILE MENU
+       ═══════════════════════════════════════ */
+    .hamburger {
+      display: none;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      width: 40px;
+      height: 40px;
+      cursor: pointer;
+      background: none;
+      border: none;
+      padding: 0;
+      z-index: 1001;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .hamburger span {
+      display: block;
+      width: 22px;
+      height: 2px;
+      background: var(--text);
+      border-radius: 2px;
+      transition: transform 0.3s cubic-bezier(0.77, 0, 0.175, 1), opacity 0.2s ease;
+    }
+    .hamburger span:nth-child(1) { margin-bottom: 5px; }
+    .hamburger span:nth-child(3) { margin-top: 5px; }
+    .hamburger.active span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+    .hamburger.active span:nth-child(2) { opacity: 0; transform: scaleX(0); }
+    .hamburger.active span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+    .mobile-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(5, 5, 5, 0.6);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      z-index: 999;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+    .mobile-overlay.active { opacity: 1; pointer-events: auto; }
+
+    .mobile-menu {
+      position: fixed;
+      top: 0;
+      right: 0;
+      width: min(300px, 80vw);
+      height: 100%;
+      background: var(--surface);
+      border-left: 1px solid var(--border);
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      padding: 5rem 2rem 2rem;
+      transform: translateX(100%);
+      transition: transform 0.35s cubic-bezier(0.77, 0, 0.175, 1);
+    }
+    .mobile-menu.active { transform: translateX(0); }
+    .mobile-menu a {
+      color: var(--text-dim);
+      text-decoration: none;
+      font-size: 1.05rem;
+      font-weight: 500;
+      padding: 0.9rem 0;
+      border-bottom: 1px solid var(--border);
+      transition: color 0.2s, padding-left 0.2s;
+      display: block;
+    }
+    .mobile-menu a:hover { color: var(--text); padding-left: 0.5rem; }
+    .mobile-menu .mobile-cta {
+      margin-top: auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--red);
+      color: #fff;
+      padding: 0.75rem 1.5rem;
+      border-radius: 10px;
+      font-weight: 700;
+      border-bottom: none;
+      transition: background 0.2s;
+    }
+    .mobile-menu .mobile-cta:hover { background: var(--red-dark); padding-left: 0; }
+
+    /* ═══════════════════════════════════════
+       HERO SECTION
+       ═══════════════════════════════════════ */
+    .hero {
+      position: relative;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 8rem 2rem 6rem;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: -20%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 900px;
+      height: 900px;
+      background: radial-gradient(circle, var(--red-glow) 0%, transparent 70%);
+      animation: heroGlow 6s ease-in-out infinite alternate;
+      pointer-events: none;
+    }
+    .hero-grid {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(var(--border) 1px, transparent 1px),
+        linear-gradient(90deg, var(--border) 1px, transparent 1px);
+      background-size: 80px 80px;
+      mask-image: radial-gradient(ellipse 60% 60% at 50% 40%, black 20%, transparent 70%);
+      -webkit-mask-image: radial-gradient(ellipse 60% 60% at 50% 40%, black 20%, transparent 70%);
+      opacity: 0.4;
+    }
+    @keyframes heroGlow {
+      0% { opacity: 0.6; transform: translateX(-50%) scale(1); }
+      100% { opacity: 1; transform: translateX(-50%) scale(1.15); }
+    }
+    .hero-content {
+      position: relative;
+      z-index: 2;
+      max-width: 860px;
+    }
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.4rem 1rem;
+      border: 1px solid var(--border-light);
+      border-radius: 100px;
+      font-size: 0.8rem;
+      font-family: var(--font-mono);
+      color: var(--text-dim);
+      margin-bottom: 2.5rem;
+      background: var(--surface);
+      animation: badgeFadeIn 1s ease-out 0.2s both;
+    }
+    .hero-badge .dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--red);
+      animation: dotPulse 2s ease-in-out infinite;
+    }
+    @keyframes dotPulse {
+      0%, 100% { opacity: 1; box-shadow: 0 0 0 0 var(--red-glow-strong); }
+      50% { opacity: 0.6; box-shadow: 0 0 0 6px transparent; }
+    }
+    @keyframes badgeFadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .hero h1 {
+      font-family: var(--font-display);
+      font-size: clamp(3rem, 7vw, 5.5rem);
+      font-weight: 800;
+      line-height: 1.1;
+      letter-spacing: -0.03em;
+      margin-bottom: 1.5rem;
+      animation: headingReveal 1s ease-out 0.4s both;
+    }
+    .hero h1 .accent {
+      background: linear-gradient(135deg, var(--red) 0%, #ff4466 50%, #ff6644 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    @keyframes headingReveal {
+      from { opacity: 0; transform: translateY(30px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .hero-sub {
+      font-size: clamp(1rem, 2vw, 1.25rem);
+      color: var(--text-dim);
+      max-width: 580px;
+      margin: 0 auto 3rem;
+      line-height: 1.7;
+      animation: headingReveal 1s ease-out 0.6s both;
+    }
+    .hero-actions {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 1rem;
+      animation: headingReveal 1s ease-out 0.8s both;
+      flex-wrap: wrap;
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.9rem 2rem;
+      border-radius: 12px;
+      font-family: var(--font-body);
+      font-size: 1rem;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      cursor: pointer;
+      border: none;
+    }
+    .btn-primary {
+      background: var(--red);
+      color: #fff;
+      box-shadow: 0 0 0 0 var(--red-glow-strong), 0 4px 20px var(--red-glow);
+    }
+    .btn-primary:hover {
+      background: #ff1a4d;
+      transform: translateY(-2px);
+      box-shadow: 0 0 0 0 var(--red-glow-strong), 0 8px 40px var(--red-glow-strong);
+    }
+    .btn-primary:active { transform: translateY(0); }
+    .btn-ghost {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border-light);
+    }
+    .btn-ghost:hover {
+      border-color: var(--text-dim);
+      background: var(--surface-2);
+      transform: translateY(-2px);
+    }
+    .btn svg { width: 18px; height: 18px; }
+
+    /* Floating cards */
+    .floating-cards {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      overflow: hidden;
+    }
+    .float-card {
+      position: absolute;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 0.75rem 1rem;
+      font-size: 0.7rem;
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+      white-space: nowrap;
+      opacity: 0;
+    }
+    .float-card:nth-child(1) { top: 20%; left: 5%; animation: floatDrift1 1.5s ease-out 1.2s forwards; }
+    .float-card:nth-child(2) { top: 30%; right: 6%; animation: floatDrift2 1.5s ease-out 1.6s forwards; }
+    .float-card:nth-child(3) { bottom: 25%; left: 8%; animation: floatDrift3 1.5s ease-out 2s forwards; }
+    .float-card:nth-child(4) { bottom: 20%; right: 4%; animation: floatDrift2 1.5s ease-out 2.4s forwards; }
+    @keyframes floatDrift1 {
+      0% { opacity: 0; transform: translateY(20px) rotate(-2deg); }
+      100% { opacity: 0.35; transform: translateY(-10px) rotate(-1deg); }
+    }
+    @keyframes floatDrift2 {
+      0% { opacity: 0; transform: translateY(20px) rotate(2deg); }
+      100% { opacity: 0.3; transform: translateY(-15px) rotate(1deg); }
+    }
+    @keyframes floatDrift3 {
+      0% { opacity: 0; transform: translateY(20px) rotate(-1deg); }
+      100% { opacity: 0.25; transform: translateY(-8px) rotate(-2deg); }
+    }
+
+    /* ═══════════════════════════════════════
+       SECTION STYLES
+       ═══════════════════════════════════════ */
+    section { padding: 7rem 2rem; position: relative; }
+    .section-container { max-width: 1100px; margin: 0 auto; }
+    .section-label {
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      color: var(--red);
+      margin-bottom: 1rem;
+    }
+    .section-title {
+      font-family: var(--font-display);
+      font-size: clamp(2rem, 4vw, 3rem);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+      margin-bottom: 1rem;
+    }
+    .section-desc {
+      color: var(--text-dim);
+      font-size: 1.05rem;
+      max-width: 550px;
+      line-height: 1.7;
+      margin-bottom: 3.5rem;
+    }
+    .divider {
+      width: 100%;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--border-light) 20%, var(--border-light) 80%, transparent);
+    }
+
+    /* ═══════════════════════════════════════
+       STATS BAR
+       ═══════════════════════════════════════ */
+    .stats-bar {
+      display: flex;
+      justify-content: center;
+      gap: 2px;
+      width: 100%;
+      padding: 60px 24px;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    .stats-bar__item { flex: 1 1 0; max-width: 220px; text-align: center; padding: 16px 12px; }
+    .stats-bar__number {
+      font-family: var(--font-mono);
+      font-size: 3rem;
+      font-weight: 700;
+      line-height: 1.1;
+      color: var(--text);
+    }
+    .stats-bar__number .stats-plus,
+    .stats-bar__number .stats-pct { color: var(--red); }
+    .stats-bar__number .stats-plus { font-size: 2rem; }
+    .stats-bar__number .stats-pct { font-size: 1.8rem; }
+    .stats-bar__label {
+      margin-top: 8px;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      letter-spacing: 0.03em;
+    }
+
+    /* ═══════════════════════════════════════
+       DEMO MOCKUP
+       ═══════════════════════════════════════ */
+    .demo-section {
+      padding: 7rem 2rem;
+      background: var(--black);
+      overflow: hidden;
+    }
+    .demo-section .mockup-container {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: flex;
+      gap: 2px;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.03), 0 20px 60px rgba(0,0,0,0.5), 0 0 120px rgba(255,0,51,0.03);
+    }
+    .demo-section .player-side { flex: 1; min-width: 0; background: var(--surface); display: flex; flex-direction: column; }
+    .demo-section .video-area {
+      position: relative;
+      aspect-ratio: 16 / 9;
+      background: linear-gradient(135deg, #0a0a0a 0%, #111 40%, #0d0d0d 100%);
+      overflow: hidden;
+    }
+    .demo-section .video-area::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(ellipse 80% 60% at 50% 45%, rgba(255,0,51,0.04) 0%, transparent 70%), linear-gradient(180deg, transparent 60%, rgba(0,0,0,0.4) 100%);
+      z-index: 1;
+    }
+    .demo-section .fake-video-content {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+      opacity: 0.08;
+    }
+    .demo-section .fake-video-content .bar {
+      height: 3px; border-radius: 2px; background: var(--text);
+      animation: barPulse 4s ease-in-out infinite;
+    }
+    .demo-section .fake-video-content .bar:nth-child(1) { width: 60%; }
+    .demo-section .fake-video-content .bar:nth-child(2) { width: 45%; animation-delay: 0.3s; }
+    .demo-section .fake-video-content .bar:nth-child(3) { width: 55%; animation-delay: 0.6s; }
+    .demo-section .fake-video-content .bar:nth-child(4) { width: 35%; animation-delay: 0.9s; }
+    @keyframes barPulse { 0%, 100% { opacity: 0.3; transform: scaleX(1); } 50% { opacity: 1; transform: scaleX(1.1); } }
+
+    .demo-section .play-btn {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 2;
+      width: 64px; height: 64px; border-radius: 50%;
+      background: rgba(255,0,51,0.9);
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 4px 24px rgba(255,0,51,0.3);
+      animation: playPulse 3s ease-in-out infinite;
+    }
+    .demo-section .play-btn::after {
+      content: ''; display: block; width: 0; height: 0;
+      border-style: solid; border-width: 10px 0 10px 18px;
+      border-color: transparent transparent transparent #fff; margin-left: 3px;
+    }
+    @keyframes playPulse {
+      0%, 100% { box-shadow: 0 4px 24px rgba(255,0,51,0.3); }
+      50% { box-shadow: 0 4px 40px rgba(255,0,51,0.5), 0 0 0 12px rgba(255,0,51,0.08); }
+    }
+
+    .demo-section .progress-bar { position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background: rgba(255,255,255,0.1); z-index: 3; }
+    .demo-section .progress-fill { height: 100%; width: 0%; background: var(--red); border-radius: 0 2px 2px 0; animation: progressAnim 16s linear infinite; }
+    @keyframes progressAnim { 0% { width: 22%; } 100% { width: 78%; } }
+
+    .demo-section .subtitle-overlay { position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%); z-index: 4; text-align: center; pointer-events: none; }
+    .demo-section .subtitle-line {
+      display: inline-block; background: rgba(0,0,0,0.82); color: #fff;
+      font-size: clamp(11px, 1.4vw, 16px); font-weight: 500;
+      padding: 4px 14px; border-radius: 4px; white-space: nowrap;
+      opacity: 0; transform: translateY(6px);
+      transition: opacity 0.5s ease, transform 0.5s ease;
+    }
+    .demo-section .subtitle-line.visible { opacity: 1; transform: translateY(0); }
+    .demo-section .subtitle-lang {
+      display: block; font-family: var(--font-mono); font-size: 9px;
+      color: var(--red); margin-top: 4px; opacity: 0;
+      transition: opacity 0.4s ease 0.2s; text-transform: uppercase; letter-spacing: 0.08em;
+    }
+    .demo-section .subtitle-line.visible .subtitle-lang { opacity: 0.8; }
+
+    .demo-section .video-controls {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 12px; background: var(--surface); border-top: 1px solid var(--border);
+    }
+    .demo-section .controls-left { display: flex; align-items: center; gap: 6px; }
+    .demo-section .ctrl-icon { width: 28px; height: 28px; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: var(--text-dim); font-size: 11px; }
+    .demo-section .ctrl-time { font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); margin-left: 4px; }
+
+    .demo-section .subscribe-actions {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 12px; background: var(--surface); border-top: 1px solid rgba(255,255,255,0.03);
+    }
+    .demo-section .sub-btn {
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 14px; border-radius: 6px;
+      font-size: 12px; font-weight: 600; cursor: default;
+      transition: all 0.3s ease; border: 1px solid transparent; white-space: nowrap;
+    }
+    .demo-section .sub-btn-transcript { background: var(--red); color: #fff; box-shadow: 0 2px 12px rgba(255,0,51,0.25); }
+    .demo-section .sub-btn-transcript.active { box-shadow: 0 2px 20px rgba(255,0,51,0.45); }
+    .demo-section .sub-btn-translate { background: var(--surface-3); color: var(--text-dim); border-color: var(--border); }
+    .demo-section .sub-btn-translate.active { color: var(--text); border-color: var(--red); box-shadow: 0 0 12px rgba(255,0,51,0.15); }
+    .demo-section .sub-btn-icon { font-size: 13px; line-height: 1; }
+    .demo-section .sub-btn-badge { font-family: var(--font-mono); font-size: 9px; background: rgba(255,255,255,0.1); padding: 2px 5px; border-radius: 3px; color: var(--text-dim); }
+    .demo-section .sub-btn-transcript .sub-btn-badge { background: rgba(255,255,255,0.15); color: rgba(255,255,255,0.8); }
+
+    .demo-section .video-meta { padding: 12px; background: var(--surface); }
+    .demo-section .video-meta-title { font-size: 13px; font-weight: 600; margin-bottom: 4px; line-height: 1.3; }
+    .demo-section .video-meta-channel { font-size: 11px; color: var(--text-dim); display: flex; align-items: center; gap: 6px; }
+    .demo-section .channel-dot {
+      width: 20px; height: 20px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--red), #cc0029);
+      display: inline-flex; align-items: center; justify-content: center;
+      font-size: 8px; font-weight: 700; color: #fff;
+    }
+
+    .demo-section .transcript-panel {
+      width: clamp(260px, 32%, 360px); background: var(--surface-2);
+      display: flex; flex-direction: column; border-left: 1px solid var(--border);
+    }
+    .demo-section .panel-header { padding: 14px 14px 10px; border-bottom: 1px solid var(--border); }
+    .demo-section .panel-title-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .demo-section .panel-title { font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
+    .demo-section .panel-title-icon { color: var(--red); font-size: 14px; }
+    .demo-section .panel-close { width: 22px; height: 22px; border-radius: 4px; background: var(--surface-3); display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 12px; }
+
+    .demo-section .panel-search { position: relative; }
+    .demo-section .search-input {
+      width: 100%; background: var(--surface); border: 1px solid var(--border);
+      border-radius: 6px; padding: 7px 10px 7px 30px; color: var(--text);
+      font-family: var(--font-mono); font-size: 11px; outline: none; transition: border-color 0.3s;
+    }
+    .demo-section .search-input::placeholder { color: var(--text-muted); }
+    .demo-section .search-input.active { border-color: var(--red); box-shadow: 0 0 0 2px rgba(255,0,51,0.1); }
+    .demo-section .search-icon { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 11px; pointer-events: none; }
+    .demo-section .search-shortcut { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); font-family: var(--font-mono); font-size: 9px; color: var(--text-muted); background: var(--surface-3); padding: 1px 5px; border-radius: 3px; border: 1px solid var(--border); }
+
+    .demo-section .transcript-list { flex: 1; overflow: hidden; padding: 6px 0; }
+    .demo-section .transcript-entry { display: flex; gap: 8px; padding: 7px 14px; transition: background 0.2s; align-items: flex-start; }
+    .demo-section .transcript-entry.highlighted { background: rgba(255,0,51,0.06); }
+    .demo-section .transcript-entry.active { background: rgba(255,0,51,0.1); border-left: 2px solid var(--red); padding-left: 12px; }
+    .demo-section .entry-time { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); min-width: 36px; padding-top: 1px; flex-shrink: 0; }
+    .demo-section .transcript-entry.active .entry-time { color: var(--red); }
+    .demo-section .entry-text { font-size: 12px; color: var(--text-dim); line-height: 1.45; }
+    .demo-section .transcript-entry.active .entry-text { color: var(--text); }
+    .demo-section .fuzzy-match { background: rgba(255,0,51,0.2); color: var(--text); padding: 0 2px; border-radius: 2px; font-weight: 600; }
+
+    .demo-section .panel-tabs { display: flex; border-bottom: 1px solid var(--border); padding: 0 14px; }
+    .demo-section .panel-tab { padding: 8px 12px; font-size: 11px; font-weight: 600; color: var(--text-muted); position: relative; transition: color 0.3s; }
+    .demo-section .panel-tab.active { color: var(--text); }
+    .demo-section .panel-tab.active::after { content: ''; position: absolute; bottom: -1px; left: 8px; right: 8px; height: 2px; background: var(--red); border-radius: 2px 2px 0 0; }
+
+    .demo-section .panel-status { padding: 8px 14px; border-top: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+    .demo-section .status-text { font-family: var(--font-mono); font-size: 9px; color: var(--text-muted); }
+    .demo-section .status-dot { width: 5px; height: 5px; border-radius: 50%; background: #22c55e; animation: dotBlink 2s ease-in-out infinite; }
+    @keyframes dotBlink { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+    .demo-section .phase-indicator { display: flex; align-items: center; justify-content: center; gap: 20px; margin-top: 32px; flex-wrap: wrap; }
+    .demo-section .phase-step { display: flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); transition: color 0.5s; white-space: nowrap; }
+    .demo-section .phase-step.active { color: var(--text); }
+    .demo-section .phase-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--border-light); transition: background 0.5s, box-shadow 0.5s; }
+    .demo-section .phase-step.active .phase-dot { background: var(--red); box-shadow: 0 0 8px rgba(255,0,51,0.5); }
+    .demo-section .phase-arrow { color: var(--border-light); font-size: 10px; }
+
+    /* ═══════════════════════════════════════
+       FEATURES SECTION
+       ═══════════════════════════════════════ */
+    #features { background: var(--surface); }
+    .features-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.25rem; }
+    .feature-card {
+      background: var(--surface-2); border: 1px solid var(--border); border-radius: 16px;
+      padding: 2rem; transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+      position: relative; overflow: hidden;
+    }
+    .feature-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+      background: linear-gradient(90deg, transparent, var(--red), transparent);
+      opacity: 0; transition: opacity 0.35s;
+    }
+    .feature-card:hover { border-color: var(--border-light); transform: translateY(-4px); box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4); }
+    .feature-card:hover::before { opacity: 1; }
+    .feature-card.featured { grid-column: span 2; background: linear-gradient(135deg, var(--surface-2) 0%, rgba(255, 0, 51, 0.03) 100%); }
+    .feature-icon {
+      width: 44px; height: 44px; border-radius: 12px;
+      background: var(--surface-3); border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 1.25rem; color: var(--red);
+    }
+    .feature-icon svg { width: 22px; height: 22px; }
+    .feature-card h3 { font-family: var(--font-display); font-size: 1.15rem; font-weight: 700; margin-bottom: 0.6rem; }
+    .feature-card p { color: var(--text-dim); font-size: 0.9rem; line-height: 1.65; }
+    .feature-tag {
+      display: inline-block; margin-top: 0.75rem; font-family: var(--font-mono);
+      font-size: 0.7rem; color: var(--text-muted); padding: 0.2rem 0.6rem;
+      background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+    }
+
+    /* ═══════════════════════════════════════
+       HOW IT WORKS
+       ═══════════════════════════════════════ */
+    .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2rem; counter-reset: step; position: relative; }
+    .steps::before { content: ''; position: absolute; top: 42px; left: 15%; right: 15%; height: 1px; background: linear-gradient(90deg, var(--border), var(--red), var(--border)); opacity: 0.5; }
+    .step { text-align: center; position: relative; }
+    .step-number {
+      width: 56px; height: 56px; border-radius: 50%; background: var(--surface-2);
+      border: 2px solid var(--border-light); display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 1.5rem; font-family: var(--font-display); font-weight: 800; font-size: 1.2rem;
+      color: var(--red); position: relative; z-index: 2; transition: all 0.3s;
+    }
+    .step:hover .step-number { border-color: var(--red); box-shadow: 0 0 20px var(--red-glow); }
+    .step h3 { font-family: var(--font-display); font-size: 1.15rem; font-weight: 700; margin-bottom: 0.5rem; }
+    .step p { color: var(--text-dim); font-size: 0.9rem; line-height: 1.6; max-width: 280px; margin: 0 auto; }
+    .step a { color: var(--red); text-decoration: none; border-bottom: 1px solid transparent; transition: border-color 0.2s; }
+    .step a:hover { border-bottom-color: var(--red); }
+
+    /* ═══════════════════════════════════════
+       BROWSER COMPATIBILITY
+       ═══════════════════════════════════════ */
+    #compatibility { background: var(--surface); }
+    .browsers-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.25rem; }
+    .browser-card {
+      background: var(--surface-2); border: 1px solid var(--border); border-radius: 16px;
+      padding: 2rem 1.5rem; text-align: center;
+      transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1); position: relative; overflow: hidden;
+    }
+    .browser-card::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+      background: linear-gradient(90deg, transparent, var(--red), transparent);
+      opacity: 0; transition: opacity 0.35s;
+    }
+    .browser-card:hover { border-color: var(--border-light); transform: translateY(-4px); box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4); }
+    .browser-card:hover::before { opacity: 1; }
+    .browser-icon { width: 64px; height: 64px; margin: 0 auto 1.25rem; }
+    .browser-icon svg { width: 100%; height: 100%; }
+    .browser-name { font-family: var(--font-display); font-size: 1.1rem; font-weight: 700; margin-bottom: 0.75rem; }
+    .browser-status {
+      display: inline-flex; align-items: center; gap: 0.4rem; font-family: var(--font-mono);
+      font-size: 0.75rem; color: #22c55e; padding: 0.3rem 0.75rem;
+      background: rgba(34, 197, 94, 0.08); border: 1px solid rgba(34, 197, 94, 0.2); border-radius: 100px;
+    }
+    .browser-status svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+    /* ═══════════════════════════════════════
+       TECH STACK
+       ═══════════════════════════════════════ */
+    #tech { background: var(--surface); }
+    .tech-grid { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+    .tech-badge {
+      display: inline-flex; align-items: center; gap: 0.6rem;
+      padding: 0.7rem 1.25rem; background: var(--surface-2); border: 1px solid var(--border);
+      border-radius: 10px; font-size: 0.85rem; font-weight: 500; color: var(--text); transition: all 0.25s;
+    }
+    .tech-badge:hover { border-color: var(--border-light); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3); }
+    .tech-badge svg { width: 18px; height: 18px; color: var(--text-dim); }
+    .tech-badge .tech-desc { color: var(--text-muted); font-size: 0.75rem; margin-left: 0.25rem; }
+
+    /* ═══════════════════════════════════════
+       FAQ ACCORDION
+       ═══════════════════════════════════════ */
+    .faq-list { max-width: 760px; }
+    .faq-item { border-bottom: 1px solid var(--border); }
+    .faq-item:first-child { border-top: 1px solid var(--border); }
+    .faq-trigger {
+      width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+      padding: 1.4rem 0; background: none; border: none; cursor: pointer;
+      font-family: var(--font-display); font-size: 1.05rem; font-weight: 600;
+      color: var(--text); text-align: left; transition: color 0.2s;
+    }
+    .faq-trigger:hover { color: #fff; }
+    .faq-chevron {
+      width: 20px; height: 20px; flex-shrink: 0; color: var(--text-muted);
+      transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), color 0.2s;
+    }
+    .faq-item.active .faq-chevron { transform: rotate(180deg); color: var(--red); }
+    .faq-content { overflow: hidden; max-height: 0; transition: max-height 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
+    .faq-answer { padding-bottom: 1.4rem; }
+    .faq-answer p { color: var(--text-dim); font-size: 0.925rem; line-height: 1.7; max-width: 640px; }
+
+    /* ═══════════════════════════════════════
+       CTA SECTION
+       ═══════════════════════════════════════ */
+    .cta-section { text-align: center; position: relative; padding: 8rem 2rem; }
+    .cta-section::before {
+      content: ''; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+      width: 600px; height: 600px;
+      background: radial-gradient(circle, var(--red-glow) 0%, transparent 70%);
+      opacity: 0.5; pointer-events: none;
+    }
+    .cta-section .section-title { max-width: 600px; margin: 0 auto 1rem; }
+    .cta-section .section-desc { max-width: 480px; margin: 0 auto 2.5rem; }
+
+    /* ═══════════════════════════════════════
+       FOOTER
+       ═══════════════════════════════════════ */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 2.5rem 2rem;
+      width: 100%;
+    }
+    footer > * {
+      max-width: 1100px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .footer-top {
+      display: flex; align-items: center; justify-content: space-between;
+      padding-bottom: 1.5rem; border-bottom: 1px solid var(--border);
+      margin-bottom: 1.5rem;
+    }
+    .footer-top span { color: var(--text-muted); font-size: 0.8rem; }
+    footer a { color: var(--text-muted); text-decoration: none; font-size: 0.8rem; transition: color 0.2s; }
+    footer a:hover { color: var(--text); }
+    .footer-links { display: flex; gap: 1.5rem; }
+
+    /* Language selector */
+    .lang-selector {
+      display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; padding: 0;
+    }
+    .lang-selector__link {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 6px 14px; font-size: 0.85rem; color: var(--text-dim);
+      text-decoration: none; border: 1px solid var(--border); border-radius: 6px;
+      transition: color 0.2s, border-color 0.2s, background 0.2s;
+    }
+    .lang-selector__link:hover { color: var(--text); border-color: var(--border-light); background: var(--surface-2); }
+    .lang-selector__flag { font-size: 1rem; line-height: 1; }
+
+    /* ═══════════════════════════════════════
+       BACK TO TOP
+       ═══════════════════════════════════════ */
+    .back-to-top {
+      position: fixed; bottom: 2rem; right: 2rem;
+      width: 42px; height: 42px; border-radius: 50%;
+      border: 1px solid var(--border-light); background: var(--surface-2);
+      color: var(--text-dim); cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      z-index: 900; opacity: 0; pointer-events: none;
+      transform: translateY(10px);
+      transition: opacity 0.3s, transform 0.3s, background 0.2s, color 0.2s, border-color 0.2s;
+    }
+    .back-to-top.visible { opacity: 1; pointer-events: auto; transform: translateY(0); }
+    .back-to-top:hover { background: var(--red); border-color: var(--red); color: #fff; }
+    .back-to-top svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+    /* ═══════════════════════════════════════
+       RESPONSIVE
+       ═══════════════════════════════════════ */
+    @media (max-width: 900px) {
+      .features-grid { grid-template-columns: repeat(2, 1fr); }
+      .feature-card.featured { grid-column: span 2; }
+      .browsers-grid { grid-template-columns: repeat(2, 1fr); }
+      .float-card { display: none; }
+      .demo-section .mockup-container { flex-direction: column; }
+      .demo-section .transcript-panel { width: 100%; max-height: 300px; border-left: none; border-top: 1px solid var(--border); }
+    }
+    @media (max-width: 680px) {
+      nav { padding: 1rem 1.25rem; }
+      .nav-links { display: none; }
+      .hamburger { display: flex; }
+      body.menu-open { overflow: hidden; }
+      section { padding: 4rem 1.25rem; }
+      .demo-section { padding: 4rem 1.25rem; }
+      .hero { padding: 7rem 1.25rem 4rem; }
+      .features-grid { grid-template-columns: 1fr; }
+      .feature-card.featured { grid-column: span 1; }
+      .steps { grid-template-columns: 1fr; gap: 2.5rem; }
+      .steps::before { display: none; }
+      .browsers-grid { grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
+      .browser-card { padding: 1.5rem 1rem; }
+      .browser-icon { width: 48px; height: 48px; }
+      .footer-top { flex-direction: column; gap: 1rem; text-align: center; }
+      .stats-bar { flex-wrap: wrap; padding: 40px 16px; }
+      .stats-bar__item { flex: 1 1 50%; max-width: none; padding: 20px 8px; }
+      .stats-bar__number { font-size: 2.2rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ─── NAVIGATION ─── -->
+  <nav>
+    <a href="#" class="nav-brand">
+      <svg class="nav-logo" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="32" height="32" rx="8" fill="#FF0033"/>
+        <path d="M10 8h8a2 2 0 012 2v12a2 2 0 01-2 2H10a2 2 0 01-2-2V10a2 2 0 012-2z" fill="none" stroke="#fff" stroke-width="1.5"/>
+        <path d="M12 13h8M12 16h6M12 19h4" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/>
+        <path d="M20 14l4-4v12l-4-4" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span class="nav-name">Sub<span>Scribe</span></span>
+    </a>
+    <ul class="nav-links">
+      <li><a href="#features">Features</a></li>
+      <li><a href="#install">Install</a></li>
+      <li><a href="#tech">Tech</a></li>
+      <li><a href="https://github.com/umitaltintas/subscribe" target="_blank" rel="noopener">GitHub <span class="gh-stars-badge" id="gh-stars-badge" data-state="hidden">&#9733; <span id="gh-stars-count">0</span></span></a></li>
+      <li><a href="subscribe.user.js" class="nav-cta">Install</a></li>
+    </ul>
+    <button class="hamburger" aria-label="Open menu" aria-expanded="false">
+      <span></span><span></span><span></span>
+    </button>
+  </nav>
+
+  <!-- Mobile menu -->
+  <div class="mobile-overlay" aria-hidden="true"></div>
+  <div class="mobile-menu" role="dialog" aria-label="Mobile navigation">
+    <a href="#features">Features</a>
+    <a href="#install">Install</a>
+    <a href="#tech">Tech</a>
+    <a href="https://github.com/umitaltintas/subscribe" target="_blank" rel="noopener">GitHub</a>
+    <a href="subscribe.user.js" class="mobile-cta">Install SubScribe</a>
+  </div>
+
+  <!-- ─── HERO ─── -->
+  <section class="hero">
+    <div class="hero-grid"></div>
+    <div class="floating-cards">
+      <div class="float-card">&#9654; transcript.extract()</div>
+      <div class="float-card">&#128269; fuzzy.search("quantum")</div>
+      <div class="float-card">&#127760; ai.translate("ja")</div>
+      <div class="float-card">&#128190; db.save(transcript)</div>
+    </div>
+    <div class="hero-content">
+      <div class="hero-badge">
+        <span class="dot"></span>
+        v1.0.0 — Tampermonkey Userscript
+      </div>
+      <h1>YouTube Transcripts,<br><span class="accent">Supercharged</span></h1>
+      <p class="hero-sub">Extract, search, translate, and overlay transcripts on any YouTube video. AI-powered. Locally stored. Zero accounts needed.</p>
+      <div class="hero-actions">
+        <a href="subscribe.user.js" class="btn btn-primary">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Install UserScript
+        </a>
+        <a href="https://github.com/umitaltintas/subscribe" class="btn btn-ghost" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+          View Source
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── STATS BAR ─── -->
+  <section class="stats-bar" id="stats-bar">
+    <div class="stats-bar__item">
+      <div class="stats-bar__number" data-target="10" data-suffix="+">0</div>
+      <div class="stats-bar__label">Languages Supported</div>
+    </div>
+    <div class="stats-bar__item">
+      <div class="stats-bar__number" data-target="0" data-suffix="">0</div>
+      <div class="stats-bar__label">Accounts Required</div>
+    </div>
+    <div class="stats-bar__item">
+      <div class="stats-bar__number" data-target="100" data-suffix="%">0</div>
+      <div class="stats-bar__label">Local Storage</div>
+    </div>
+    <div class="stats-bar__item">
+      <div class="stats-bar__number" data-target="infinity" data-suffix="">&infin;</div>
+      <div class="stats-bar__label">Videos Supported</div>
+    </div>
+  </section>
+
+  <!-- ─── DEMO MOCKUP ─── -->
+  <section class="demo-section" id="demo">
+    <div class="section-container">
+      <div class="reveal">
+        <p class="section-label">// See It In Action</p>
+        <h2 class="section-title">Built right into YouTube</h2>
+      </div>
+    </div>
+    <div class="mockup-container reveal reveal-delay-1">
+      <div class="player-side">
+        <div class="video-area">
+          <div class="fake-video-content"><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div></div>
+          <div class="play-btn"></div>
+          <div class="subtitle-overlay">
+            <span class="subtitle-line" id="demoSubtitle">
+              <span class="subtitle-text"></span>
+              <span class="subtitle-lang"></span>
+            </span>
+          </div>
+          <div class="progress-bar"><div class="progress-fill"></div></div>
+        </div>
+        <div class="video-controls">
+          <div class="controls-left">
+            <div class="ctrl-icon">&#9654;</div>
+            <div class="ctrl-icon">&#9193;</div>
+            <div class="ctrl-icon">&#128264;</div>
+            <span class="ctrl-time" id="demoTime">3:24</span>
+            <span class="ctrl-time" style="color:var(--text-muted);opacity:0.5"> / 12:07</span>
+          </div>
+          <div class="controls-left">
+            <div class="ctrl-icon" style="font-size:10px;">CC</div>
+            <div class="ctrl-icon">&#9881;</div>
+            <div class="ctrl-icon">&#9974;</div>
+          </div>
+        </div>
+        <div class="subscribe-actions">
+          <div class="sub-btn sub-btn-transcript" id="btnTranscript"><span class="sub-btn-icon">&#9776;</span> Transcript <span class="sub-btn-badge">42 seg</span></div>
+          <div class="sub-btn sub-btn-translate" id="btnTranslate"><span class="sub-btn-icon">&#127760;</span> Translate <span class="sub-btn-badge">EN</span></div>
+        </div>
+        <div class="video-meta">
+          <div class="video-meta-title">Understanding Neural Networks: A Visual Guide</div>
+          <div class="video-meta-channel"><span class="channel-dot">A</span> AI Academy &middot; 248K views &middot; 2 days ago</div>
+        </div>
+      </div>
+      <div class="transcript-panel" id="transcriptPanel">
+        <div class="panel-header">
+          <div class="panel-title-row">
+            <div class="panel-title"><span class="panel-title-icon">&#9776;</span> SubScribe</div>
+            <div class="panel-close">&times;</div>
+          </div>
+          <div class="panel-search">
+            <span class="search-icon">&#128269;</span>
+            <input type="text" class="search-input" id="demoSearch" placeholder="Fuzzy search transcript..." readonly>
+            <span class="search-shortcut">/</span>
+          </div>
+        </div>
+        <div class="panel-tabs">
+          <div class="panel-tab active" id="tabTranscript">Transcript</div>
+          <div class="panel-tab" id="tabTranslation">Translation</div>
+        </div>
+        <div class="transcript-list" id="transcriptList">
+          <div class="transcript-entry" data-idx="0"><span class="entry-time">3:12</span><span class="entry-text">A neural network is essentially a series of algorithms that try to recognize patterns.</span></div>
+          <div class="transcript-entry active" data-idx="1"><span class="entry-time">3:24</span><span class="entry-text">Each layer of the network transforms the data, learning increasingly abstract representations.</span></div>
+          <div class="transcript-entry" data-idx="2"><span class="entry-time">3:38</span><span class="entry-text">The backpropagation algorithm adjusts the weights to minimize prediction errors.</span></div>
+          <div class="transcript-entry" data-idx="3"><span class="entry-time">3:51</span><span class="entry-text">Think of gradient descent as rolling a ball down a hill to find the lowest point.</span></div>
+          <div class="transcript-entry" data-idx="4"><span class="entry-time">4:03</span><span class="entry-text">Activation functions introduce non-linearity, allowing the network to learn complex patterns.</span></div>
+          <div class="transcript-entry" data-idx="5"><span class="entry-time">4:18</span><span class="entry-text">Convolutional layers are especially powerful for image recognition tasks.</span></div>
+          <div class="transcript-entry" data-idx="6"><span class="entry-time">4:32</span><span class="entry-text">Dropout is a regularization technique that prevents overfitting during training.</span></div>
+        </div>
+        <div class="panel-status"><span class="status-text" id="statusText">42 segments &middot; synced</span><span class="status-dot"></span></div>
+      </div>
+    </div>
+    <div class="phase-indicator">
+      <div class="phase-step active" data-phase="extract"><span class="phase-dot"></span> Extract</div>
+      <span class="phase-arrow">&#8594;</span>
+      <div class="phase-step" data-phase="search"><span class="phase-dot"></span> Fuzzy Search</div>
+      <span class="phase-arrow">&#8594;</span>
+      <div class="phase-step" data-phase="translate"><span class="phase-dot"></span> Translate</div>
+      <span class="phase-arrow">&#8594;</span>
+      <div class="phase-step" data-phase="overlay"><span class="phase-dot"></span> Overlay</div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ─── FEATURES ─── -->
+  <section id="features">
+    <div class="section-container">
+      <div class="reveal">
+        <p class="section-label">// Features</p>
+        <h2 class="section-title">Everything you need<br>for YouTube transcripts</h2>
+        <p class="section-desc">A complete toolkit built right into YouTube's interface. No external apps, no accounts, no data leaving your browser.</p>
+      </div>
+      <div class="features-grid">
+        <div class="feature-card featured reveal reveal-delay-1">
+          <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>
+          <h3>Fuzzy Search Across Everything</h3>
+          <p>Powered by Fuse.js — search across titles, channels, tags, and full transcript content with intelligent typo tolerance. Find any moment in any video instantly.</p>
+          <span class="feature-tag">fuse.js</span>
+        </div>
+        <div class="feature-card reveal reveal-delay-2">
+          <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></div>
+          <h3>One-Click Extraction</h3>
+          <p>Grab any video's full transcript with or without timestamps in a single click.</p>
+        </div>
+        <div class="feature-card reveal reveal-delay-3">
+          <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg></div>
+          <h3>AI Translation</h3>
+          <p>Translate into 10+ languages via OpenRouter. Supports Gemini, Claude, GPT, and more.</p>
+          <span class="feature-tag">openrouter</span>
+        </div>
+        <div class="feature-card reveal reveal-delay-4">
+          <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div>
+          <h3>Subtitle Overlay</h3>
+          <p>Display translated subtitles directly on the YouTube player in real-time as you watch.</p>
+        </div>
+        <div class="feature-card reveal reveal-delay-5">
+          <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg></div>
+          <h3>Transcript Library</h3>
+          <p>All transcripts stored locally in IndexedDB. Favorites, tags, and full-text search. No cloud, no signup.</p>
+          <span class="feature-tag">IndexedDB</span>
+        </div>
+        <div class="feature-card reveal reveal-delay-5">
+          <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg></div>
+          <h3>Dashboard</h3>
+          <p>Full management UI with history, favorites, translations, statistics, and data export/import.</p>
+        </div>
+        <div class="feature-card reveal reveal-delay-6">
+          <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></div>
+          <h3>Cost Tracking</h3>
+          <p>See token usage and cost per translation. Know exactly what you're spending via OpenRouter's generation API.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ─── HOW IT WORKS ─── -->
+  <section id="install">
+    <div class="section-container">
+      <div class="reveal" style="text-align:center; margin-bottom: 4rem;">
+        <p class="section-label">// Get Started</p>
+        <h2 class="section-title">Up and running in 3 steps</h2>
+        <p class="section-desc" style="margin-left:auto; margin-right:auto;">No build tools, no configuration. Install and start using it immediately.</p>
+      </div>
+      <div class="steps">
+        <div class="step reveal reveal-delay-1">
+          <div class="step-number">1</div>
+          <h3>Install Tampermonkey</h3>
+          <p>Get the <a href="https://www.tampermonkey.net/" target="_blank" rel="noopener">Tampermonkey</a> extension for Chrome, Firefox, Edge, or Safari.</p>
+        </div>
+        <div class="step reveal reveal-delay-2">
+          <div class="step-number">2</div>
+          <h3>Add SubScribe</h3>
+          <p>Click the install button above — Tampermonkey will detect and prompt you to install it automatically.</p>
+        </div>
+        <div class="step reveal reveal-delay-3">
+          <div class="step-number">3</div>
+          <h3>Open YouTube</h3>
+          <p>New buttons appear on YouTube's interface. Extract, search, translate — all right there.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ─── BROWSER COMPATIBILITY ─── -->
+  <section id="compatibility">
+    <div class="section-container">
+      <div class="reveal">
+        <p class="section-label">// Compatibility</p>
+        <h2 class="section-title">Works everywhere you watch</h2>
+      </div>
+      <div class="browsers-grid reveal reveal-delay-1">
+        <div class="browser-card">
+          <div class="browser-icon"><svg viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="20" stroke="#4285F4" stroke-width="2.5"/><circle cx="24" cy="24" r="8" fill="#4285F4"/><path d="M24 4a20 20 0 0117.32 10H24" stroke="#EA4335" stroke-width="2.5" stroke-linecap="round"/><path d="M6.68 14A20 20 0 0124 44" stroke="#34A853" stroke-width="2.5" stroke-linecap="round"/><path d="M24 44a20 20 0 0017.32-30" stroke="#FBBC05" stroke-width="2.5" stroke-linecap="round"/></svg></div>
+          <h4 class="browser-name">Chrome</h4>
+          <span class="browser-status"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="#22c55e" stroke-width="1.5"/><path d="M5 8.5l2 2 4-4" stroke="#22c55e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Supported</span>
+        </div>
+        <div class="browser-card">
+          <div class="browser-icon"><svg viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="20" stroke="#FF7139" stroke-width="2.5"/><path d="M24 8c-2 0-5 1-6.5 3.5C16 14 16.5 18 19 20c2 1.5 3 3 3 5v3c0 2 1 4 3.5 4s4-2 4-5c0-4 5-5 5-11 0-5-4.5-8-10.5-8z" fill="#FF7139"/></svg></div>
+          <h4 class="browser-name">Firefox</h4>
+          <span class="browser-status"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="#22c55e" stroke-width="1.5"/><path d="M5 8.5l2 2 4-4" stroke="#22c55e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Supported</span>
+        </div>
+        <div class="browser-card">
+          <div class="browser-icon"><svg viewBox="0 0 48 48" fill="none"><path d="M24 4C13 4 4 13 4 24s9 20 20 20 20-9 20-20S35 4 24 4z" stroke="#0078D4" stroke-width="2.5"/><path d="M10 24c0-2.5.7-5 2-7l12 7-12 7a14 14 0 01-2-7z" fill="#0078D4"/><path d="M24 10c5.5 0 10.3 3.2 12.6 8H24V10z" fill="#0078D4" opacity="0.7"/><path d="M24 30v8c5.5 0 10.3-3.2 12.6-8H24z" fill="#0078D4" opacity="0.5"/></svg></div>
+          <h4 class="browser-name">Edge</h4>
+          <span class="browser-status"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="#22c55e" stroke-width="1.5"/><path d="M5 8.5l2 2 4-4" stroke="#22c55e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Supported</span>
+        </div>
+        <div class="browser-card">
+          <div class="browser-icon"><svg viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="20" stroke="#06B6D4" stroke-width="2.5"/><circle cx="24" cy="24" r="4" fill="#06B6D4"/><path d="M24 8v12M24 28v12" stroke="#06B6D4" stroke-width="2.5" stroke-linecap="round"/><path d="M10.8 16.4l10.4 6M26.8 25.6l10.4 6" stroke="#06B6D4" stroke-width="2.5" stroke-linecap="round"/><path d="M10.8 31.6l10.4-6M26.8 22.4l10.4-6" stroke="#06B6D4" stroke-width="2.5" stroke-linecap="round"/></svg></div>
+          <h4 class="browser-name">Safari</h4>
+          <span class="browser-status"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="#22c55e" stroke-width="1.5"/><path d="M5 8.5l2 2 4-4" stroke="#22c55e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Supported</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ─── TECH STACK ─── -->
+  <section id="tech">
+    <div class="section-container">
+      <div class="reveal">
+        <p class="section-label">// Built With</p>
+        <h2 class="section-title">Tech Stack</h2>
+        <p class="section-desc">Modern tools, minimal footprint. The entire script bundles into a single file.</p>
+      </div>
+      <div class="tech-grid reveal reveal-delay-1">
+        <div class="tech-badge"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M1.125 0C.502 0 0 .502 0 1.125v21.75C0 23.498.502 24 1.125 24h21.75c.623 0 1.125-.502 1.125-1.125V1.125C24 .502 23.498 0 22.875 0H1.125zm17.363 9.75c.612 0 1.154.037 1.677.12a6.988 6.988 0 011.403.44v3.34a4.893 4.893 0 00-.788-.433 4.734 4.734 0 00-1.748-.35c-.405 0-.707.073-.907.217a.696.696 0 00-.3.586c0 .26.107.467.322.622.215.154.684.375 1.406.663.803.322 1.38.662 1.727 1.022.35.36.524.862.524 1.506 0 .937-.342 1.645-1.026 2.123-.684.478-1.6.717-2.747.717-.893 0-1.683-.132-2.37-.396v-3.473c.338.22.716.394 1.136.521.42.128.822.191 1.207.191.404 0 .7-.064.888-.192a.615.615 0 00.281-.535.693.693 0 00-.352-.607c-.235-.14-.743-.373-1.524-.7-.698-.291-1.226-.642-1.582-1.053-.357-.41-.535-.926-.535-1.546 0-.895.334-1.608 1-2.138.667-.53 1.56-.795 2.678-.795zM10.74 8.744h3.052v7.29c0 1.598-.353 2.774-1.058 3.529-.706.754-1.8 1.187-3.285 1.294l-.431-1.869c.762-.136 1.304-.416 1.628-.838.325-.422.488-1.076.488-1.963V8.744zM6.85 8.744h3.052v7.547H6.85V8.744z"/></svg> TypeScript</div>
+        <div class="tech-badge"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1.608L3.804 6.3v9.384L12 20.392l8.196-4.708V6.3L12 1.608zM12 0l9.804 5.627v11.246L12 22.5 2.196 16.873V5.627L12 0z"/><path d="M12 5.627L7.608 8.16v5.064L12 15.76l4.392-2.536V8.16L12 5.627z"/></svg> esbuild <span class="tech-desc">— fast bundling</span></div>
+        <div class="tech-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Fuse.js <span class="tech-desc">— fuzzy search</span></div>
+        <div class="tech-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg> IndexedDB <span class="tech-desc">— local storage</span></div>
+        <div class="tech-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg> OpenRouter API <span class="tech-desc">— multi-model AI</span></div>
+        <div class="tech-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Trusted Types <span class="tech-desc">— CSP compatible</span></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ─── FAQ ─── -->
+  <section id="faq">
+    <div class="section-container">
+      <div class="reveal">
+        <p class="section-label">// FAQ</p>
+        <h2 class="section-title">Common questions</h2>
+      </div>
+      <div class="faq-list reveal reveal-delay-1">
+        <div class="faq-item">
+          <button class="faq-trigger" aria-expanded="false"><span>Is my data safe?</span><svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
+          <div class="faq-content"><div class="faq-answer"><p>Yes. All transcripts are stored locally in your browser's IndexedDB. Nothing is sent to any server. Your data never leaves your machine.</p></div></div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-trigger" aria-expanded="false"><span>Is it free?</span><svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
+          <div class="faq-content"><div class="faq-answer"><p>Completely free and open-source under the MIT license. The only potential cost is if you use AI translation via OpenRouter, which has its own pricing.</p></div></div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-trigger" aria-expanded="false"><span>Do I need an API key?</span><svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
+          <div class="faq-content"><div class="faq-answer"><p>Only for AI translation. Basic features like transcript extraction, search, and the library work without any API key. For translation, you'll need a free OpenRouter API key.</p></div></div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-trigger" aria-expanded="false"><span>Which browsers are supported?</span><svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
+          <div class="faq-content"><div class="faq-answer"><p>Any browser that supports Tampermonkey: Chrome, Firefox, Edge, and Safari. The userscript uses standard web APIs and works across all modern browsers.</p></div></div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-trigger" aria-expanded="false"><span>Can I export my transcripts?</span><svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
+          <div class="faq-content"><div class="faq-answer"><p>Yes. The dashboard has a full export/import feature. You can back up all your transcripts, favorites, tags, and translations as a JSON file.</p></div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ─── CTA ─── -->
+  <section class="cta-section">
+    <div class="section-container reveal">
+      <p class="section-label">// Ready?</p>
+      <h2 class="section-title">Start managing your<br>YouTube transcripts today</h2>
+      <p class="section-desc">Free, open-source, and runs entirely in your browser. Your data stays yours.</p>
+      <div class="hero-actions" style="margin-top:2rem;">
+        <a href="subscribe.user.js" class="btn btn-primary">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Install SubScribe
+        </a>
+        <a href="https://github.com/umitaltintas/subscribe" class="btn btn-ghost" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+          View on GitHub
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── FOOTER ─── -->
+  <footer>
+    <div class="footer-top">
+      <span>MIT License &copy; 2025 <a href="https://github.com/umitaltintas" target="_blank" rel="noopener">umitaltintas</a></span>
+      <div class="footer-links">
+        <a href="https://github.com/umitaltintas/subscribe" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/umitaltintas/subscribe/releases" target="_blank" rel="noopener">Releases</a>
+        <a href="https://github.com/umitaltintas/subscribe/issues" target="_blank" rel="noopener">Issues</a>
+      </div>
+    </div>
+    <div class="lang-selector" role="navigation" aria-label="Documentation languages">
+      <a class="lang-selector__link" href="https://github.com/umitaltintas/subscribe/blob/main/README.md" target="_blank" rel="noopener">&#127482;&#127480; English</a>
+      <a class="lang-selector__link" href="https://github.com/umitaltintas/subscribe/blob/main/docs/README.tr.md" target="_blank" rel="noopener">&#127481;&#127479; T&uuml;rk&ccedil;e</a>
+      <a class="lang-selector__link" href="https://github.com/umitaltintas/subscribe/blob/main/docs/README.de.md" target="_blank" rel="noopener">&#127465;&#127466; Deutsch</a>
+      <a class="lang-selector__link" href="https://github.com/umitaltintas/subscribe/blob/main/docs/README.es.md" target="_blank" rel="noopener">&#127466;&#127480; Espa&ntilde;ol</a>
+      <a class="lang-selector__link" href="https://github.com/umitaltintas/subscribe/blob/main/docs/README.ja.md" target="_blank" rel="noopener">&#127471;&#127477; &#26085;&#26412;&#35486;</a>
+    </div>
+  </footer>
+
+  <!-- Back to top -->
+  <button class="back-to-top" aria-label="Back to top">
+    <svg viewBox="0 0 24 24"><polyline points="18 15 12 9 6 15"/></svg>
+  </button>
+
+  <!-- ─── SCRIPTS ─── -->
+  <script>
+    // Scroll reveal
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => { if (entry.isIntersecting) entry.target.classList.add('visible'); });
+    }, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' });
+    document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+    // Nav scroll
+    const navEl = document.querySelector('nav');
+    window.addEventListener('scroll', () => { navEl.classList.toggle('scrolled', window.scrollY > 40); }, { passive: true });
+
+    // Smooth scroll
+    document.querySelectorAll('a[href^="#"]').forEach(a => {
+      a.addEventListener('click', e => {
+        e.preventDefault();
+        const t = document.querySelector(a.getAttribute('href'));
+        if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    });
+
+    // Mobile menu
+    (() => {
+      const hamburger = document.querySelector('.hamburger');
+      const mobileMenu = document.querySelector('.mobile-menu');
+      const overlay = document.querySelector('.mobile-overlay');
+      function close() {
+        hamburger.classList.remove('active');
+        mobileMenu.classList.remove('active');
+        overlay.classList.remove('active');
+        hamburger.setAttribute('aria-expanded', 'false');
+        document.body.classList.remove('menu-open');
+      }
+      hamburger.addEventListener('click', () => {
+        const open = mobileMenu.classList.contains('active');
+        open ? close() : (hamburger.classList.add('active'), mobileMenu.classList.add('active'), overlay.classList.add('active'), hamburger.setAttribute('aria-expanded', 'true'), document.body.classList.add('menu-open'));
+      });
+      overlay.addEventListener('click', close);
+      mobileMenu.querySelectorAll('a').forEach(l => l.addEventListener('click', close));
+      document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+    })();
+
+    // Back to top
+    (() => {
+      const btn = document.querySelector('.back-to-top');
+      window.addEventListener('scroll', () => { btn.classList.toggle('visible', window.scrollY > 400); }, { passive: true });
+      btn.addEventListener('click', () => { window.scrollTo({ top: 0, behavior: 'smooth' }); });
+    })();
+
+    // GitHub stars
+    (() => {
+      const badge = document.getElementById('gh-stars-badge');
+      const countEl = document.getElementById('gh-stars-count');
+      if (!badge || !countEl) return;
+      const KEY = 'subscribe_gh_stars', TTL = 1800000;
+      function show(c) { countEl.textContent = c.toLocaleString(); badge.removeAttribute('data-state'); }
+      try { const c = JSON.parse(sessionStorage.getItem(KEY)); if (c && Date.now() - c.ts < TTL) { show(c.stars); return; } } catch(_) {}
+      fetch('https://api.github.com/repos/umitaltintas/subscribe').then(r => r.json()).then(d => {
+        if (typeof d.stargazers_count === 'number') { show(d.stargazers_count); try { sessionStorage.setItem(KEY, JSON.stringify({ stars: d.stargazers_count, ts: Date.now() })); } catch(_) {} }
+      }).catch(() => {});
+    })();
+
+    // Animated counters
+    (() => {
+      const bar = document.getElementById('stats-bar');
+      if (!bar) return;
+      const nums = bar.querySelectorAll('.stats-bar__number');
+      let done = false;
+      function animate(el) {
+        const t = el.getAttribute('data-target'), s = el.getAttribute('data-suffix') || '';
+        if (t === 'infinity') { el.innerHTML = '&infin;'; return; }
+        const target = parseInt(t, 10);
+        if (target === 0) { el.textContent = '0'; return; }
+        const start = performance.now();
+        function step(now) {
+          const p = Math.min((now - start) / 1600, 1), ease = 1 - Math.pow(1 - p, 3);
+          el.textContent = Math.round(ease * target);
+          if (p < 1) requestAnimationFrame(step);
+          else if (s === '+') el.innerHTML = target + '<span class="stats-plus">+</span>';
+          else if (s === '%') el.innerHTML = target + '<span class="stats-pct">%</span>';
+          else el.textContent = target + s;
+        }
+        requestAnimationFrame(step);
+      }
+      new IntersectionObserver(entries => {
+        entries.forEach(e => { if (e.isIntersecting && !done) { done = true; nums.forEach(animate); } });
+      }, { threshold: 0.3 }).observe(bar);
+    })();
+
+    // FAQ accordion
+    (() => {
+      const items = document.querySelectorAll('.faq-item');
+      items.forEach(item => {
+        item.querySelector('.faq-trigger').addEventListener('click', () => {
+          const active = item.classList.contains('active');
+          items.forEach(o => { o.classList.remove('active'); o.querySelector('.faq-trigger').setAttribute('aria-expanded', 'false'); o.querySelector('.faq-content').style.maxHeight = '0'; });
+          if (!active) { item.classList.add('active'); item.querySelector('.faq-trigger').setAttribute('aria-expanded', 'true'); const c = item.querySelector('.faq-content'); c.style.maxHeight = c.querySelector('.faq-answer').scrollHeight + 'px'; }
+        });
+      });
+    })();
+
+    // Demo mockup animation
+    (() => {
+      const subtitleEl = document.getElementById('demoSubtitle');
+      if (!subtitleEl) return;
+      const subtitleText = subtitleEl.querySelector('.subtitle-text');
+      const subtitleLang = subtitleEl.querySelector('.subtitle-lang');
+      const searchInput = document.getElementById('demoSearch');
+      const transcriptList = document.getElementById('transcriptList');
+      const entries = transcriptList.querySelectorAll('.transcript-entry');
+      const btnTranscript = document.getElementById('btnTranscript');
+      const btnTranslate = document.getElementById('btnTranslate');
+      const tabTranscript = document.getElementById('tabTranscript');
+      const tabTranslation = document.getElementById('tabTranslation');
+      const statusText = document.getElementById('statusText');
+      const phaseSteps = document.querySelectorAll('.demo-section .phase-step');
+
+      const subs = [
+        { text: 'Each layer transforms the data, learning abstract representations.', lang: 'English' },
+        { text: 'Cada capa transforma los datos, aprendiendo representaciones abstractas.', lang: 'Espanol' },
+        { text: 'Chaque couche transforme les donnees en representations abstraites.', lang: 'Francais' },
+        { text: 'Jede Schicht transformiert die Daten und lernt abstrakte Darstellungen.', lang: 'Deutsch' },
+      ];
+      const origTexts = []; entries.forEach(e => origTexts.push(e.querySelector('.entry-text').innerHTML));
+      const DUR = 4000;
+
+      function setPhase(n) { phaseSteps.forEach(s => s.classList.toggle('active', s.dataset.phase === n)); }
+      function reset() { entries.forEach((e,i) => { e.classList.remove('active','highlighted'); e.querySelector('.entry-text').innerHTML = origTexts[i]; e.style.opacity = ''; }); entries[1].classList.add('active'); }
+      function typeIn(el, text, spd, cb) { let i=0; el.value=''; (function t(){ if(i<text.length){el.value+=text[i];i++;setTimeout(t,spd);}else if(cb)cb(); })(); }
+
+      function phase0() {
+        setPhase('extract'); reset();
+        btnTranscript.classList.add('active'); btnTranslate.classList.remove('active');
+        tabTranscript.classList.add('active'); tabTranslation.classList.remove('active');
+        searchInput.classList.remove('active'); searchInput.value='';
+        statusText.textContent='42 segments \u00b7 synced';
+        subtitleText.textContent=subs[0].text; subtitleLang.textContent=''; subtitleEl.classList.add('visible');
+        let idx=0; const iv=setInterval(()=>{ entries.forEach(e=>e.classList.remove('active')); if(idx<entries.length) entries[idx++].classList.add('active'); },500);
+        setTimeout(()=>{ clearInterval(iv); phase1(); }, DUR);
+      }
+      function phase1() {
+        setPhase('search'); reset(); subtitleEl.classList.remove('visible');
+        searchInput.classList.add('active'); statusText.textContent='searching...';
+        typeIn(searchInput,'backprop',120,()=>{
+          entries.forEach((e,i)=>{ const t=origTexts[i]; if(t.toLowerCase().includes('backprop')){ e.classList.add('highlighted'); e.querySelector('.entry-text').innerHTML=t.replace(/(backpropagation)/i,'<span class="fuzzy-match">$1</span>'); } else { e.style.opacity='0.35'; } });
+          statusText.textContent='1 match \u00b7 fuzzy';
+        });
+        setTimeout(()=>{ entries.forEach(e=>{e.style.opacity='';}); searchInput.classList.remove('active'); phase2(); }, DUR);
+      }
+      function phase2() {
+        setPhase('translate'); reset(); searchInput.value='';
+        btnTranslate.classList.add('active'); tabTranscript.classList.remove('active'); tabTranslation.classList.add('active');
+        statusText.textContent='translating...';
+        const tr=['Una red neuronal es una serie de algoritmos que reconocen patrones.','Cada capa transforma los datos, aprendiendo representaciones abstractas.','El algoritmo de retropropagacion ajusta los pesos para minimizar errores.','El descenso de gradiente es como hacer rodar una pelota por una colina.','Las funciones de activacion introducen no linealidad.','Las capas convolucionales son potentes para reconocimiento de imagenes.','El dropout previene el sobreajuste durante el entrenamiento.'];
+        let i=0; const iv=setInterval(()=>{ if(i<entries.length){ const t=entries[i].querySelector('.entry-text'); t.style.transition='opacity 0.3s'; t.style.opacity='0'; const ci=i; setTimeout(()=>{t.textContent=tr[ci];t.style.opacity='1';},300); i++; } },350);
+        setTimeout(()=>{ statusText.textContent='42 segments \u00b7 ES'; },2800);
+        setTimeout(()=>{ clearInterval(iv); entries.forEach(e=>{const t=e.querySelector('.entry-text');t.style.transition='';t.style.opacity='';}); phase3(); }, DUR);
+      }
+      function phase3() {
+        setPhase('overlay'); reset(); searchInput.value='';
+        tabTranscript.classList.add('active'); tabTranslation.classList.remove('active');
+        btnTranslate.classList.remove('active'); statusText.textContent='42 segments \u00b7 synced';
+        let si=0;
+        function showSub(){ subtitleEl.classList.remove('visible'); setTimeout(()=>{ subtitleText.textContent=subs[si].text; subtitleLang.textContent=subs[si].lang; subtitleEl.classList.add('visible'); si=(si+1)%subs.length; },400); }
+        showSub(); const iv=setInterval(showSub,2200);
+        let ei=0; const eiv=setInterval(()=>{ entries.forEach(e=>e.classList.remove('active')); entries[ei%entries.length].classList.add('active'); ei++; },1800);
+        setTimeout(()=>{ clearInterval(iv); clearInterval(eiv); subtitleEl.classList.remove('visible'); setTimeout(phase0,600); }, DUR*2);
+      }
+      // Start on visibility
+      const demoObs = new IntersectionObserver(entries2 => {
+        if (entries2[0].isIntersecting) { demoObs.disconnect(); setTimeout(phase0, 800); }
+      }, { threshold: 0.2 });
+      demoObs.observe(document.querySelector('.demo-section'));
+    })();
+  </script>
+</body>
+</html>
