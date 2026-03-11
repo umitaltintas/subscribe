@@ -745,7 +745,7 @@
     .browser-card:hover { border-color: var(--border-light); transform: translateY(-4px); box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4); }
     .browser-card:hover::before { opacity: 1; }
     .browser-icon { width: 64px; height: 64px; margin: 0 auto 1.25rem; }
-    .browser-icon svg { width: 100%; height: 100%; }
+    .browser-icon svg, .browser-icon img { width: 100%; height: 100%; filter: invert(1); }
     .browser-name { font-family: var(--font-display); font-size: 1.1rem; font-weight: 700; margin-bottom: 0.75rem; }
     .browser-status {
       display: inline-flex; align-items: center; gap: 0.4rem; font-family: var(--font-mono);
@@ -1160,22 +1160,22 @@
       </div>
       <div class="browsers-grid reveal reveal-delay-1">
         <div class="browser-card">
-          <div class="browser-icon"><svg viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="20" stroke="#4285F4" stroke-width="2.5"/><circle cx="24" cy="24" r="8" fill="#4285F4"/><path d="M24 4a20 20 0 0117.32 10H24" stroke="#EA4335" stroke-width="2.5" stroke-linecap="round"/><path d="M6.68 14A20 20 0 0124 44" stroke="#34A853" stroke-width="2.5" stroke-linecap="round"/><path d="M24 44a20 20 0 0017.32-30" stroke="#FBBC05" stroke-width="2.5" stroke-linecap="round"/></svg></div>
+          <div class="browser-icon"><img src="https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/googlechrome.svg" alt="Chrome" width="48" height="48"></div>
           <h4 class="browser-name">Chrome</h4>
           <span class="browser-status"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="#22c55e" stroke-width="1.5"/><path d="M5 8.5l2 2 4-4" stroke="#22c55e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Supported</span>
         </div>
         <div class="browser-card">
-          <div class="browser-icon"><svg viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="20" stroke="#FF7139" stroke-width="2.5"/><path d="M24 8c-2 0-5 1-6.5 3.5C16 14 16.5 18 19 20c2 1.5 3 3 3 5v3c0 2 1 4 3.5 4s4-2 4-5c0-4 5-5 5-11 0-5-4.5-8-10.5-8z" fill="#FF7139"/></svg></div>
+          <div class="browser-icon"><img src="https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/firefox.svg" alt="Firefox" width="48" height="48"></div>
           <h4 class="browser-name">Firefox</h4>
           <span class="browser-status"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="#22c55e" stroke-width="1.5"/><path d="M5 8.5l2 2 4-4" stroke="#22c55e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Supported</span>
         </div>
         <div class="browser-card">
-          <div class="browser-icon"><svg viewBox="0 0 48 48" fill="none"><path d="M24 4C13 4 4 13 4 24s9 20 20 20 20-9 20-20S35 4 24 4z" stroke="#0078D4" stroke-width="2.5"/><path d="M10 24c0-2.5.7-5 2-7l12 7-12 7a14 14 0 01-2-7z" fill="#0078D4"/><path d="M24 10c5.5 0 10.3 3.2 12.6 8H24V10z" fill="#0078D4" opacity="0.7"/><path d="M24 30v8c5.5 0 10.3-3.2 12.6-8H24z" fill="#0078D4" opacity="0.5"/></svg></div>
+          <div class="browser-icon"><img src="https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/microsoftedge.svg" alt="Edge" width="48" height="48"></div>
           <h4 class="browser-name">Edge</h4>
           <span class="browser-status"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="#22c55e" stroke-width="1.5"/><path d="M5 8.5l2 2 4-4" stroke="#22c55e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Supported</span>
         </div>
         <div class="browser-card">
-          <div class="browser-icon"><svg viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="20" stroke="#06B6D4" stroke-width="2.5"/><circle cx="24" cy="24" r="4" fill="#06B6D4"/><path d="M24 8v12M24 28v12" stroke="#06B6D4" stroke-width="2.5" stroke-linecap="round"/><path d="M10.8 16.4l10.4 6M26.8 25.6l10.4 6" stroke="#06B6D4" stroke-width="2.5" stroke-linecap="round"/><path d="M10.8 31.6l10.4-6M26.8 22.4l10.4-6" stroke="#06B6D4" stroke-width="2.5" stroke-linecap="round"/></svg></div>
+          <div class="browser-icon"><img src="https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/safari.svg" alt="Safari" width="48" height="48"></div>
           <h4 class="browser-name">Safari</h4>
           <span class="browser-status"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="#22c55e" stroke-width="1.5"/><path d="M5 8.5l2 2 4-4" stroke="#22c55e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Supported</span>
         </div>
