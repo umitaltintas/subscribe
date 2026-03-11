@@ -1,6 +1,6 @@
 {
   "name": "subscribe-userscript",
-  "version": "5.0.0",
+  "version": "1.0.0",
   "description": "YouTube transcript manager userscript with fuzzy search, AI translation, and subtitle overlay",
   "author": "umitaltintas",
   "license": "MIT",

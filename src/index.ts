@@ -31,7 +31,7 @@ const init = async (): Promise<void> => {
   }
 
   setupRouter();
-  console.log("[YTC] YouTube Transcript Pro v5.0 loaded");
+  console.log("[SubScribe] v1.0.0 loaded");
 };
 
 if (document.readyState === "complete") {

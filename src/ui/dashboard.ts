@@ -215,7 +215,7 @@ export const showDashboard = async (
         <div class="ytc-section" style="margin-top:24px">
           <div class="ytc-section-title">${icons.info} Hakkında</div>
           <div style="font-size:13px;color:var(--ytc-muted);line-height:1.6">
-            <p><strong>YouTube Transcript Pro v5.0</strong></p>
+            <p><strong>SubScribe v1.0.0</strong></p>
             <p>Fuse.js ile güçlendirilmiş fuzzy search.</p>
           </div>
         </div>
