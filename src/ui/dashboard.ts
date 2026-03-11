@@ -29,6 +29,7 @@ const showTranslationViewer = (item: TranscriptRecord, lang: string, translated:
           <span>${icons.tv} ${esc(item.channel)}</span>
           <span>${icons.translate} ${esc(langName)}</span>
         </div>
+        ${item.summary ? `<div style="background:rgba(255,255,255,.05);border-left:3px solid rgba(76,175,80,.5);padding:10px 14px;margin-bottom:14px;border-radius:6px;font-size:13px;line-height:1.5;color:rgba(255,255,255,.7)"><strong style="color:rgba(255,255,255,.9)">Video Özeti:</strong> ${esc(item.summary)}</div>` : ""}
         <div class="ytc-preview">${esc(translated)}</div>
       </div>
       <div class="ytc-modal-footer">

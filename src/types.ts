@@ -14,6 +14,7 @@ export interface TranscriptRecord {
   chars: number;
   tokens: number;
   translations?: Record<string, string>;
+  summary?: string;
 }
 
 export interface VideoInfo {

@@ -188,17 +188,21 @@ export const injectVideoButton = (): void => {
       }
 
       try {
-        const translated = await translateTranscript(
+        const result = await translateTranscript(
           transcript,
           settings.targetLanguage,
           settings,
-          (percent) => {
-            setHTML(translateBtn, `${icons.translate} %${percent}`);
+          (percent, stage) => {
+            if (stage === "analyzing") {
+              setHTML(translateBtn, `${icons.translate} Analiz ediliyor...`);
+            } else {
+              setHTML(translateBtn, `${icons.translate} %${percent}`);
+            }
           },
         );
 
         // Cache in memory
-        translationCache.set(cacheKey, translated);
+        translationCache.set(cacheKey, result.translated);
 
         // Save to DB — create record if it doesn't exist yet
         if (videoId) {
@@ -214,15 +218,19 @@ export const injectVideoButton = (): void => {
                 transcript,
                 tokens: Math.ceil(transcript.length / 4),
                 words: transcript.split(/\s+/).length,
-                translations: { [settings.targetLanguage]: translated },
+                translations: { [settings.targetLanguage]: result.translated },
+                summary: result.summary,
               });
             } else {
-              await db.saveTranslation(videoId, settings.targetLanguage, translated);
+              await db.saveTranslation(videoId, settings.targetLanguage, result.translated);
+              if (result.summary) {
+                await db.update(videoId, { summary: result.summary });
+              }
             }
           } catch {}
         }
 
-        const cues = parseCuesFromTranslatedText(translated);
+        const cues = parseCuesFromTranslatedText(result.translated);
         if (cues.length > 0) {
           showSubtitleOverlay(cues);
           const usage = getLastTranslationUsage();

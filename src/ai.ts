@@ -72,9 +72,8 @@ const fetchGenerationCost = async (generationId: string, apiKey: string): Promis
   }
 };
 
-export const translateChunk = async (
-  chunk: string,
-  targetLang: string,
+const summarizeTranscript = async (
+  transcript: string,
   settings: AISettings,
 ): Promise<string> => {
   const response = await fetch(CONFIG.AI.OPENROUTER_URL, {
@@ -89,20 +88,81 @@ export const translateChunk = async (
       messages: [
         {
           role: "system",
-          content: `You are an expert localization specialist. Localize the following video transcript into ${targetLang}.
+          content: `Analyze this video transcript and provide a brief context summary (3-5 sentences). Include:
+- The main topic/theme
+- The speaker's tone and style (formal, casual, technical, humorous, etc.)
+- Key terminology or jargon used
+- The target audience
 
-CRITICAL FORMAT RULE:
-- The input has ONE line per timestamp: [MM:SS] text
-- Your output MUST keep this EXACT same format: one line per timestamp, each line starting with the original timestamp.
-- Do NOT merge lines. Do NOT split lines. Do NOT remove line breaks. The number of output lines MUST equal the number of input lines.
+Output ONLY the summary. No headers, labels, or extra formatting.`,
+        },
+        {
+          role: "user",
+          content: transcript,
+        },
+      ],
+    }),
+  });
+
+  if (!response.ok) return "";
+  const data = await response.json();
+
+  const usage = data.usage;
+  if (usage) {
+    lastTranslationUsage.promptTokens += usage.prompt_tokens ?? 0;
+    lastTranslationUsage.completionTokens += usage.completion_tokens ?? 0;
+  }
+  if (data.id) {
+    const cost = await fetchGenerationCost(data.id, settings.apiKey);
+    lastTranslationUsage.totalCost += cost;
+  }
+
+  return data.choices?.[0]?.message?.content ?? "";
+};
+
+export const translateChunk = async (
+  chunk: string,
+  targetLang: string,
+  settings: AISettings,
+  context: string = "",
+): Promise<string> => {
+  const contextBlock = context
+    ? `\nVIDEO CONTEXT (use this to maintain consistency and accuracy):\n${context}\n`
+    : "";
+
+  const response = await fetch(CONFIG.AI.OPENROUTER_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${settings.apiKey}`,
+      "Content-Type": "application/json",
+      "HTTP-Referer": window.location.href,
+    },
+    body: JSON.stringify({
+      model: settings.model,
+      messages: [
+        {
+          role: "system",
+          content: `You are an expert localization specialist. Localize the following video transcript into ${targetLang}.
+${contextBlock}
+FORMAT RULES:
+- Each input line is: [MM:SS] text
+- Keep every timestamp in the same order. Do NOT add or remove timestamps.
+- Each output line MUST start with the original timestamp.
+
+NATURAL SENTENCE RULE:
+- The source transcript often splits a single sentence across multiple timestamps. Do NOT reproduce these awkward splits.
+- Write complete, natural sentences in ${targetLang}. Redistribute the meaning freely across the timestamp lines.
+- It is OK for a translated line to cover more or less meaning than the corresponding source line, as long as every timestamp has meaningful text and the overall meaning is fully preserved.
 
 Example input:
-[0:00] Hello everyone, welcome back
-[0:05] Today we're going to talk about AI
+[0:00] So today we're going to
+[0:03] talk about something really important
+[0:06] which is artificial intelligence
 
 Example output for Turkish:
-[0:00] Herkese merhaba, tekrar hoş geldiniz
-[0:05] Bugün yapay zeka hakkında konuşacağız
+[0:00] Bugün çok önemli bir konudan bahsedeceğiz.
+[0:03] Yapay zeka!
+[0:06] Hadi başlayalım.
 
 Localization rules:
 - Adapt meaning, tone and intent naturally — do NOT translate word-by-word.
@@ -168,13 +228,20 @@ export const translateTranscript = async (
   transcript: string,
   targetLang: string,
   settings: AISettings,
-  onProgress?: (percent: number) => void,
-): Promise<string> => {
+  onProgress?: (percent: number, stage?: string) => void,
+): Promise<{ translated: string; summary: string }> => {
   lastTranslationUsage = { promptTokens: 0, completionTokens: 0, totalCost: 0 };
   const cleaned = cleanTranscript(transcript);
+
+  // First pass: summarize the full transcript for context
+  onProgress?.(0, "analyzing");
+  const summary = await summarizeTranscript(cleaned, settings);
+
   const chunks = chunkTranscript(cleaned);
   const total = chunks.length;
   let completed = 0;
+
+  onProgress?.(0, "translating");
 
   // Process chunks in parallel batches of up to 5
   const CONCURRENCY = 5;
@@ -183,10 +250,10 @@ export const translateTranscript = async (
   for (let start = 0; start < total; start += CONCURRENCY) {
     const batch = chunks.slice(start, start + CONCURRENCY);
     const promises = batch.map((chunk, i) =>
-      translateChunk(chunk, targetLang, settings).then((translated) => {
+      translateChunk(chunk, targetLang, settings, summary).then((translated) => {
         results[start + i] = translated;
         completed++;
-        onProgress?.(Math.round((completed / total) * 100));
+        onProgress?.(Math.round((completed / total) * 100), "translating");
       }),
     );
 
@@ -197,5 +264,5 @@ export const translateTranscript = async (
     }
   }
 
-  return results.join("\n");
+  return { translated: results.join("\n"), summary };
 };

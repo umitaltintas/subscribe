@@ -138,23 +138,30 @@ export const showTranscriptViewer = (
       const origText = translateBtn.innerHTML;
 
       try {
-        const translated = await translateTranscript(
+        const result = await translateTranscript(
           currentRecord.transcript,
           langCode,
           settings,
-          (percent) => {
-            setHTML(translateBtn, `${icons.translate} Çevriliyor... %${percent}`);
+          (percent, stage) => {
+            if (stage === "analyzing") {
+              setHTML(translateBtn, `${icons.translate} Analiz ediliyor...`);
+            } else {
+              setHTML(translateBtn, `${icons.translate} Çevriliyor... %${percent}`);
+            }
           },
         );
 
-        await db.saveTranslation(currentRecord.id, langCode, translated);
+        await db.saveTranslation(currentRecord.id, langCode, result.translated);
+        if (result.summary) {
+          await db.update(currentRecord.id, { summary: result.summary });
+        }
 
         // Update local record
-        currentRecord = { ...currentRecord, translations: { ...currentRecord.translations, [langCode]: translated } };
+        currentRecord = { ...currentRecord, translations: { ...currentRecord.translations, [langCode]: result.translated }, summary: result.summary };
 
         // Show translated text
         const transcriptEl = modal.querySelector("#ytc-viewer-transcript") as HTMLElement;
-        setHTML(transcriptEl, esc(translated));
+        setHTML(transcriptEl, esc(result.translated));
 
         updateTranslationBadge();
         showToast("Çeviri tamamlandı!");
