@@ -1,5 +1,2 @@
 node_modules/
 dist/
-*.lock
-bun.lock
-package-lock.json
