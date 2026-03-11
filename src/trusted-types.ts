@@ -1,17 +1,15 @@
-interface PassthroughPolicy {
-  createHTML(s: string): unknown;
-  createScriptURL(s: string): unknown;
+import DOMPurify from "dompurify";
+
+if (typeof trustedTypes !== "undefined" && trustedTypes) {
+  DOMPurify.setConfig({ RETURN_TRUSTED_TYPE: true });
 }
 
-const makePassthrough = (): PassthroughPolicy => ({
-  createHTML: (s: string) => s,
-  createScriptURL: (s: string) => s,
-});
-
-export const policy: PassthroughPolicy =
-  typeof trustedTypes !== "undefined" && trustedTypes
-    ? trustedTypes.createPolicy("ytc", {
-        createHTML: (s: string) => s,
-        createScriptURL: (s: string) => s,
-      })
-    : makePassthrough();
+export const sanitize = (html: string): string =>
+  DOMPurify.sanitize(html, {
+    ADD_TAGS: ["svg", "path", "circle", "ellipse", "line", "polyline", "polygon", "rect"],
+    ADD_ATTR: [
+      "viewBox", "fill", "stroke", "stroke-width", "stroke-linecap",
+      "stroke-linejoin", "d", "cx", "cy", "r", "rx", "ry", "x", "y",
+      "x1", "x2", "y1", "y2", "width", "height", "points", "xmlns",
+    ],
+  }) as unknown as string;

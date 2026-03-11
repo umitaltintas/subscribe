@@ -1,20 +1,13 @@
 import { esc } from "./utils";
 import { icons } from "./icons";
-import { policy } from "./trusted-types";
+import { sanitize } from "./trusted-types";
 
 export const $ = (sel: string): Element | null => document.querySelector(sel);
 export const $$ = (sel: string): NodeListOf<Element> =>
   document.querySelectorAll(sel);
 
 export const setHTML = (el: Element, html: string): void => {
-  const trusted = policy.createHTML(html);
-  const doc = new DOMParser().parseFromString(
-    trusted as string,
-    "text/html",
-  );
-  el.replaceChildren(
-    ...Array.from(doc.body.childNodes).map((n) => document.adoptNode(n)),
-  );
+  el.innerHTML = sanitize(html);
 };
 
 export const showToast = (

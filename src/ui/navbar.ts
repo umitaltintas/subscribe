@@ -1,5 +1,5 @@
 import { $, $$, setHTML, injectStyles, showToast } from "../dom";
-import { sleep } from "../utils";
+import { sleep, mdToHtml } from "../utils";
 import { icons } from "../icons";
 import { db } from "../db";
 import { openTranscript, getTranscriptText, getVideoInfo } from "../transcript";
@@ -87,14 +87,7 @@ const showSummaryModal = (summary: string): void => {
   const modal = document.createElement("div");
   modal.className = "ytc-modal-bg ytc-summary-modal";
 
-  // Convert basic markdown to HTML
-  const htmlContent = summary
-    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    .replace(/^### (.+)$/gm, '<h4 style="margin:12px 0 6px;color:var(--ytc-accent)">$1</h4>')
-    .replace(/^## (.+)$/gm, '<h3 style="margin:14px 0 8px;color:var(--ytc-accent)">$1</h3>')
-    .replace(/^# (.+)$/gm, '<h2 style="margin:16px 0 10px;color:var(--ytc-accent)">$1</h2>')
-    .replace(/^- (.+)$/gm, '<li style="margin:4px 0;margin-left:16px">$1</li>')
-    .replace(/\n/g, "<br>");
+  const htmlContent = mdToHtml(summary);
 
   setHTML(modal, `
     <div class="ytc-modal" style="width:min(600px,95vw)">

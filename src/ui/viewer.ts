@@ -1,5 +1,5 @@
 import { $, setHTML, showToast } from "../dom";
-import { esc, truncate, formatDate } from "../utils";
+import { esc, truncate, formatDate, mdToHtml } from "../utils";
 import { icons } from "../icons";
 import { CONFIG } from "../config";
 import { db } from "../db";
@@ -180,13 +180,7 @@ export const showTranscriptViewer = (
       // Check if summary already exists
       if (currentRecord.userSummary) {
         const transcriptEl = modal.querySelector("#ytc-viewer-transcript") as HTMLElement;
-        const htmlContent = currentRecord.userSummary
-          .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-          .replace(/^### (.+)$/gm, '<h4 style="margin:12px 0 6px;color:var(--ytc-accent)">$1</h4>')
-          .replace(/^## (.+)$/gm, '<h3 style="margin:14px 0 8px;color:var(--ytc-accent)">$1</h3>')
-          .replace(/^# (.+)$/gm, '<h2 style="margin:16px 0 10px;color:var(--ytc-accent)">$1</h2>')
-          .replace(/^- (.+)$/gm, '<li style="margin:4px 0;margin-left:16px">$1</li>')
-          .replace(/\n/g, "<br>");
+        const htmlContent = mdToHtml(currentRecord.userSummary);
         setHTML(transcriptEl, htmlContent);
         showToast("Mevcut özet gösteriliyor");
         return;
@@ -209,13 +203,7 @@ export const showTranscriptViewer = (
         currentRecord = { ...currentRecord, userSummary: summary };
 
         const transcriptEl = modal.querySelector("#ytc-viewer-transcript") as HTMLElement;
-        const htmlContent = summary
-          .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-          .replace(/^### (.+)$/gm, '<h4 style="margin:12px 0 6px;color:var(--ytc-accent)">$1</h4>')
-          .replace(/^## (.+)$/gm, '<h3 style="margin:14px 0 8px;color:var(--ytc-accent)">$1</h3>')
-          .replace(/^# (.+)$/gm, '<h2 style="margin:16px 0 10px;color:var(--ytc-accent)">$1</h2>')
-          .replace(/^- (.+)$/gm, '<li style="margin:4px 0;margin-left:16px">$1</li>')
-          .replace(/\n/g, "<br>");
+        const htmlContent = mdToHtml(summary);
         setHTML(transcriptEl, htmlContent);
         showToast("Özet hazır!");
       } catch (err) {

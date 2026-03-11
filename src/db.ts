@@ -1,3 +1,4 @@
+import { openDB, type IDBPDatabase } from "idb";
 import { CONFIG } from "./config";
 import { searchManager } from "./search";
 import type {
@@ -8,9 +9,11 @@ import type {
   AISettings,
 } from "./types";
 
+type DB = IDBPDatabase<unknown>;
+
 export class TranscriptDB {
-  private db: IDBDatabase | null = null;
-  public ready: Promise<IDBDatabase>;
+  private db: DB | null = null;
+  public ready: Promise<DB>;
   private cache: TranscriptRecord[] | null = null;
   private cacheTime = 0;
   private readonly CACHE_TTL = 5000;
@@ -19,24 +22,13 @@ export class TranscriptDB {
     this.ready = this.init();
   }
 
-  private init(): Promise<IDBDatabase> {
-    return new Promise((resolve, reject) => {
-      const request = indexedDB.open(CONFIG.DB_NAME, CONFIG.DB_VERSION);
-
-      request.onerror = () => reject(request.error);
-      request.onsuccess = () => {
-        this.db = request.result;
-        resolve(this.db);
-      };
-
-      request.onupgradeneeded = (e) => {
-        const db = (e.target as IDBOpenDBRequest).result;
-
+  private async init(): Promise<DB> {
+    this.db = await openDB(CONFIG.DB_NAME, CONFIG.DB_VERSION, {
+      upgrade(db) {
         if (!db.objectStoreNames.contains(CONFIG.STORE_NAME)) {
           const store = db.createObjectStore(CONFIG.STORE_NAME, {
             keyPath: "id",
           });
-
           store.createIndex("date", "date", { unique: false });
           store.createIndex("channel", "channel", { unique: false });
           store.createIndex("favorite", "favorite", { unique: false });
@@ -46,8 +38,9 @@ export class TranscriptDB {
           });
           store.createIndex("title", "title", { unique: false });
         }
-      };
+      },
     });
+    return this.db;
   }
 
   invalidateCache(): void {
@@ -56,40 +49,25 @@ export class TranscriptDB {
     searchManager.invalidate();
   }
 
-  private async getStore(
-    mode: IDBTransactionMode = "readonly",
-  ): Promise<IDBObjectStore> {
-    await this.ready;
-    const tx = this.db!.transaction(CONFIG.STORE_NAME, mode);
-    return tx.objectStore(CONFIG.STORE_NAME);
-  }
-
   async add(record: Partial<TranscriptRecord>): Promise<TranscriptRecord> {
-    const store = await this.getStore("readwrite");
+    await this.ready;
     this.invalidateCache();
 
-    return new Promise((resolve, reject) => {
-      const data = {
-        ...record,
-        date: record.date || new Date().toISOString(),
-        favorite: record.favorite || false,
-        tags: record.tags || [],
-        copyCount: record.copyCount || 1,
-      } as TranscriptRecord;
+    const data = {
+      ...record,
+      date: record.date || new Date().toISOString(),
+      favorite: record.favorite || false,
+      tags: record.tags || [],
+      copyCount: record.copyCount || 1,
+    } as TranscriptRecord;
 
-      const request = store.put(data);
-      request.onsuccess = () => resolve(data);
-      request.onerror = () => reject(request.error);
-    });
+    await this.db!.put(CONFIG.STORE_NAME, data);
+    return data;
   }
 
   async get(id: string): Promise<TranscriptRecord | undefined> {
-    const store = await this.getStore();
-    return new Promise((resolve, reject) => {
-      const request = store.get(id);
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
+    await this.ready;
+    return this.db!.get(CONFIG.STORE_NAME, id);
   }
 
   async update(
@@ -102,14 +80,10 @@ export class TranscriptDB {
   }
 
   async delete(id: string): Promise<boolean> {
-    const store = await this.getStore("readwrite");
+    await this.ready;
     this.invalidateCache();
-
-    return new Promise((resolve, reject) => {
-      const request = store.delete(id);
-      request.onsuccess = () => resolve(true);
-      request.onerror = () => reject(request.error);
-    });
+    await this.db!.delete(CONFIG.STORE_NAME, id);
+    return true;
   }
 
   async getAll(options: { limit?: number } = {}): Promise<TranscriptRecord[]> {
@@ -118,25 +92,23 @@ export class TranscriptDB {
       return this.cache;
     }
 
-    const store = await this.getStore();
-    return new Promise((resolve, reject) => {
-      const request = store.index("date").openCursor(null, "prev");
-      const results: TranscriptRecord[] = [];
+    await this.ready;
+    const limit = options.limit || 500;
+    const results: TranscriptRecord[] = [];
 
-      request.onsuccess = (e) => {
-        const cursor = (e.target as IDBRequest<IDBCursorWithValue | null>)
-          .result;
-        if (cursor && results.length < (options.limit || 500)) {
-          results.push(cursor.value);
-          cursor.continue();
-        } else {
-          this.cache = results;
-          this.cacheTime = now;
-          resolve(results);
-        }
-      };
-      request.onerror = () => reject(request.error);
-    });
+    let cursor = await this.db!
+      .transaction(CONFIG.STORE_NAME)
+      .store.index("date")
+      .openCursor(null, "prev");
+
+    while (cursor && results.length < limit) {
+      results.push(cursor.value as TranscriptRecord);
+      cursor = await cursor.continue();
+    }
+
+    this.cache = results;
+    this.cacheTime = now;
+    return results;
   }
 
   async getFavorites(): Promise<TranscriptRecord[]> {
@@ -231,29 +203,19 @@ export class TranscriptDB {
     langCode: string,
     translatedText: string,
   ): Promise<void> {
-    const store = await this.getStore("readwrite");
+    await this.ready;
+    const tx = this.db!.transaction(CONFIG.STORE_NAME, "readwrite");
+    const record = (await tx.store.get(id)) as TranscriptRecord | undefined;
 
-    return new Promise((resolve, reject) => {
-      const request = store.get(id);
-      request.onsuccess = () => {
-        const record = request.result as TranscriptRecord | undefined;
-        if (!record) {
-          reject(new Error(`Record not found: ${id}`));
-          return;
-        }
+    if (!record) {
+      throw new Error(`Record not found: ${id}`);
+    }
 
-        record.translations = record.translations || {};
-        record.translations[langCode] = translatedText;
-
-        const putRequest = store.put(record);
-        putRequest.onsuccess = () => {
-          this.invalidateCache();
-          resolve();
-        };
-        putRequest.onerror = () => reject(putRequest.error);
-      };
-      request.onerror = () => reject(request.error);
-    });
+    record.translations = record.translations || {};
+    record.translations[langCode] = translatedText;
+    await tx.store.put(record);
+    await tx.done;
+    this.invalidateCache();
   }
 
   getAISettings(): AISettings | null {
@@ -267,14 +229,10 @@ export class TranscriptDB {
   }
 
   async clear(): Promise<boolean> {
-    const store = await this.getStore("readwrite");
+    await this.ready;
     this.invalidateCache();
-
-    return new Promise((resolve, reject) => {
-      const request = store.clear();
-      request.onsuccess = () => resolve(true);
-      request.onerror = () => reject(request.error);
-    });
+    await this.db!.clear(CONFIG.STORE_NAME);
+    return true;
   }
 
   async export(): Promise<string> {
@@ -284,16 +242,14 @@ export class TranscriptDB {
 
   async import(jsonData: string): Promise<number> {
     const data = JSON.parse(jsonData) as TranscriptRecord[];
-    const store = await this.getStore("readwrite");
+    await this.ready;
     this.invalidateCache();
 
+    const tx = this.db!.transaction(CONFIG.STORE_NAME, "readwrite");
     for (const item of data) {
-      await new Promise<void>((resolve, reject) => {
-        const request = store.put(item);
-        request.onsuccess = () => resolve();
-        request.onerror = () => reject(request.error);
-      });
+      await tx.store.put(item);
     }
+    await tx.done;
 
     return data.length;
   }

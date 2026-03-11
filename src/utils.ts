@@ -1,4 +1,11 @@
+import { marked } from "marked";
+import { formatDistanceToNow } from "date-fns";
+import { tr } from "date-fns/locale";
 import type { TextStats } from "./types";
+
+marked.setOptions({ async: false, gfm: true, breaks: true });
+
+export const mdToHtml = (md: string): string => marked.parse(md) as string;
 
 export const sleep = (ms: number): Promise<void> =>
   new Promise((r) => setTimeout(r, ms));
@@ -47,15 +54,11 @@ export const countStats = (text: string): TextStats => {
 
 export const formatDate = (iso: string): string => {
   const d = new Date(iso);
-  const now = new Date();
-  const diff = now.getTime() - d.getTime();
+  const diff = Date.now() - d.getTime();
 
-  if (diff < 60000) return "Az önce";
-  if (diff < 3600000) return `${Math.floor(diff / 60000)} dk önce`;
-  if (diff < 86400000) return `${Math.floor(diff / 3600000)} saat önce`;
-  if (diff < 604800000) return `${Math.floor(diff / 86400000)} gün önce`;
+  if (diff > 604800000) return d.toLocaleDateString("tr-TR");
 
-  return d.toLocaleDateString("tr-TR");
+  return formatDistanceToNow(d, { addSuffix: true, locale: tr });
 };
 
 export const truncate = (str: string, len: number): string =>
