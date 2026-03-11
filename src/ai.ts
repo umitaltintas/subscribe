@@ -1,0 +1,201 @@
+import { CONFIG } from "./config";
+import type { AISettings, SubtitleCue } from "./types";
+
+export const parseTimestampedTranscript = (text: string): SubtitleCue[] => {
+  const lines = text.split("\n").filter((l) => l.trim());
+  const cues: SubtitleCue[] = [];
+
+  for (const line of lines) {
+    const match = line.match(/^\[(?:(\d+):)?(\d+):(\d+)\]\s*(.+)$/);
+    if (!match) continue;
+
+    const hours = match[1] ? parseInt(match[1], 10) : 0;
+    const minutes = parseInt(match[2], 10);
+    const seconds = parseInt(match[3], 10);
+    const startTime = hours * 3600 + minutes * 60 + seconds;
+    const text = match[4].trim();
+
+    cues.push({ startTime, endTime: 0, text });
+  }
+
+  for (let i = 0; i < cues.length; i++) {
+    cues[i].endTime =
+      i < cues.length - 1 ? cues[i + 1].startTime : cues[i].startTime + 5;
+  }
+
+  return cues;
+};
+
+export const chunkTranscript = (
+  text: string,
+  chunkSize: number = CONFIG.AI.CHUNK_SIZE,
+): string[] => {
+  const lines = text.split("\n");
+  const chunks: string[] = [];
+  let current = "";
+
+  for (const line of lines) {
+    if (current.length + line.length + 1 > chunkSize && current.length > 0) {
+      chunks.push(current.trim());
+      current = "";
+    }
+    current += (current ? "\n" : "") + line;
+  }
+
+  if (current.trim()) {
+    chunks.push(current.trim());
+  }
+
+  return chunks;
+};
+
+export interface TranslationUsage {
+  promptTokens: number;
+  completionTokens: number;
+  totalCost: number;
+}
+
+let lastTranslationUsage: TranslationUsage = { promptTokens: 0, completionTokens: 0, totalCost: 0 };
+
+export const getLastTranslationUsage = (): TranslationUsage => lastTranslationUsage;
+
+const fetchGenerationCost = async (generationId: string, apiKey: string): Promise<number> => {
+  try {
+    const res = await fetch(`https://openrouter.ai/api/v1/generation?id=${generationId}`, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+    if (!res.ok) return 0;
+    const data = await res.json();
+    return data.data?.total_cost ?? 0;
+  } catch {
+    return 0;
+  }
+};
+
+export const translateChunk = async (
+  chunk: string,
+  targetLang: string,
+  settings: AISettings,
+): Promise<string> => {
+  const response = await fetch(CONFIG.AI.OPENROUTER_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${settings.apiKey}`,
+      "Content-Type": "application/json",
+      "HTTP-Referer": window.location.href,
+    },
+    body: JSON.stringify({
+      model: settings.model,
+      messages: [
+        {
+          role: "system",
+          content: `You are an expert localization specialist. Localize the following video transcript into ${targetLang}.
+
+CRITICAL FORMAT RULE:
+- The input has ONE line per timestamp: [MM:SS] text
+- Your output MUST keep this EXACT same format: one line per timestamp, each line starting with the original timestamp.
+- Do NOT merge lines. Do NOT split lines. Do NOT remove line breaks. The number of output lines MUST equal the number of input lines.
+
+Example input:
+[0:00] Hello everyone, welcome back
+[0:05] Today we're going to talk about AI
+
+Example output for Turkish:
+[0:00] Herkese merhaba, tekrar hoş geldiniz
+[0:05] Bugün yapay zeka hakkında konuşacağız
+
+Localization rules:
+- Adapt meaning, tone and intent naturally — do NOT translate word-by-word.
+- Use culturally appropriate expressions and phrasing native to ${targetLang}.
+- Preserve the speaker's style and register (formal, casual, humorous, technical).
+- Keep technical terms, brand names, and proper nouns unchanged unless they have a widely accepted localized form.
+- Output ONLY the localized lines. No commentary, notes, or extra text.`,
+        },
+        {
+          role: "user",
+          content: chunk,
+        },
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.text().catch(() => "Unknown error");
+    throw new Error(
+      `OpenRouter API error (${response.status}): ${errorBody}`,
+    );
+  }
+
+  const data = await response.json();
+
+  if (!data.choices?.[0]?.message?.content) {
+    throw new Error("OpenRouter API returned an empty or invalid response");
+  }
+
+  // Track token usage
+  const usage = data.usage;
+  if (usage) {
+    lastTranslationUsage.promptTokens += usage.prompt_tokens ?? 0;
+    lastTranslationUsage.completionTokens += usage.completion_tokens ?? 0;
+  }
+
+  // Fetch actual cost from generation endpoint
+  if (data.id) {
+    const cost = await fetchGenerationCost(data.id, settings.apiKey);
+    lastTranslationUsage.totalCost += cost;
+  }
+
+  return data.choices[0].message.content;
+};
+
+const cleanTranscript = (text: string): string => {
+  const seen = new Set<string>();
+  return text
+    .split("\n")
+    .filter((line) => {
+      const trimmed = line.trim();
+      // Remove empty lines, bare brackets, timestamp-only lines
+      if (!trimmed || trimmed === "[]" || /^\[\d{1,2}:\d{2}(:\d{2})?\]\s*$/.test(trimmed)) return false;
+      // Deduplicate identical lines
+      if (seen.has(trimmed)) return false;
+      seen.add(trimmed);
+      return true;
+    })
+    .join("\n");
+};
+
+export const translateTranscript = async (
+  transcript: string,
+  targetLang: string,
+  settings: AISettings,
+  onProgress?: (percent: number) => void,
+): Promise<string> => {
+  lastTranslationUsage = { promptTokens: 0, completionTokens: 0, totalCost: 0 };
+  const cleaned = cleanTranscript(transcript);
+  const chunks = chunkTranscript(cleaned);
+  const total = chunks.length;
+  let completed = 0;
+
+  // Process chunks in parallel batches of up to 5
+  const CONCURRENCY = 5;
+  const results: string[] = new Array(total);
+
+  for (let start = 0; start < total; start += CONCURRENCY) {
+    const batch = chunks.slice(start, start + CONCURRENCY);
+    const promises = batch.map((chunk, i) =>
+      translateChunk(chunk, targetLang, settings).then((translated) => {
+        results[start + i] = translated;
+        completed++;
+        onProgress?.(Math.round((completed / total) * 100));
+      }),
+    );
+
+    const settled = await Promise.allSettled(promises);
+    const failed = settled.find((r) => r.status === "rejected");
+    if (failed && failed.status === "rejected") {
+      throw new Error(`Translation failed: ${failed.reason instanceof Error ? failed.reason.message : String(failed.reason)}`);
+    }
+  }
+
+  return results.join("\n");
+};
