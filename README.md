@@ -1,6 +1,12 @@
 # SubScribe
 
+[![Build](https://github.com/umitaltintas/subscribe/actions/workflows/build.yml/badge.svg)](https://github.com/umitaltintas/subscribe/actions/workflows/build.yml)
+[![Release](https://img.shields.io/github/v/release/umitaltintas/subscribe)](https://github.com/umitaltintas/subscribe/releases/latest)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 A powerful YouTube transcript manager userscript with fuzzy search, AI-powered translation, and real-time subtitle overlay.
+
+**[Turkce](docs/README.tr.md)** | **[Deutsch](docs/README.de.md)** | **[Espanol](docs/README.es.md)** | **[日本語](docs/README.ja.md)**
 
 ## Features
 
@@ -14,34 +20,42 @@ A powerful YouTube transcript manager userscript with fuzzy search, AI-powered t
 
 ## Installation
 
+### From Release (Recommended)
+
 1. Install [Tampermonkey](https://www.tampermonkey.net/) (Chrome, Firefox, Edge, Safari)
-2. Build the userscript:
-   ```bash
-   npm install
-   npm run build
-   ```
-3. Copy the contents of `dist/userscript.js` into a new Tampermonkey script — or set up Tampermonkey to load from a local file
+2. Download `subscribe.user.js` from the [latest release](https://github.com/umitaltintas/subscribe/releases/latest)
+3. Open Tampermonkey dashboard and drag the file into it — or create a new script and paste the contents
+
+### From Source
+
+```bash
+bun install
+bun run build
+```
+
+The built userscript will be at `dist/userscript.js`.
 
 ### Development
 
 ```bash
-npm run watch    # Rebuild on file changes
-npm run typecheck # Run TypeScript type checking
+bun run watch      # Rebuild on file changes
+bun run typecheck  # Run TypeScript type checking
 ```
 
 ## Usage
 
-Once installed, you'll see two new buttons on YouTube:
+Once installed, you'll see new buttons on YouTube:
 
 ### Navbar
-- **Transcript Manager** button (document icon) — Opens the dashboard with your transcript library
-- **Settings** button (gear icon) — Configure AI translation settings
+- **Transcript Manager** (document icon) — Opens the dashboard with your transcript library
+- **Settings** (gear icon) — Configure AI translation settings
 
 ### Video Page
-- **Transkript** button — Extract and save the current video's transcript
+- **Transcript** button — Extract and save the current video's transcript
 - **Translate** button — Translate the transcript and show subtitles on the video
 
 ### Dashboard Tabs
+
 | Tab | Description |
 |-----|-------------|
 | History | All saved transcripts with fuzzy search and filters |
@@ -91,6 +105,10 @@ src/
     ├── copy-modal.ts      # Copy & tag modal
     └── settings.ts        # AI settings modal
 ```
+
+## Contributing
+
+Contributions are welcome! Feel free to open an issue or submit a pull request.
 
 ## License
 
