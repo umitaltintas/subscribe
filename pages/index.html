@@ -10,7 +10,7 @@
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://umitaltintas.github.io/subscribe/">
   <meta property="og:image" content="https://umitaltintas.github.io/subscribe/og-image.svg">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📜</text></svg>">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><defs><linearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'><stop offset='0%25' stop-color='%23FF3B30'/><stop offset='50%25' stop-color='%23FF2D55'/><stop offset='100%25' stop-color='%23AF52DE'/></linearGradient></defs><rect width='512' height='512' rx='112' fill='%2309090B'/><rect x='160' y='128' width='56' height='256' rx='28' fill='url(%23g)'/><rect x='240' y='176' width='56' height='160' rx='28' fill='url(%23g)'/><rect x='320' y='224' width='56' height='64' rx='28' fill='url(%23g)'/></svg>">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -30,10 +30,11 @@
       --text: #e8e8e8;
       --text-dim: #888;
       --text-muted: #555;
-      --red: #FF0033;
-      --red-dark: #CC0029;
-      --red-glow: rgba(255, 0, 51, 0.15);
-      --red-glow-strong: rgba(255, 0, 51, 0.35);
+      --red: #FF2D55;
+      --red-dark: #E0264C;
+      --purple: #AF52DE;
+      --red-glow: rgba(255, 45, 85, 0.15);
+      --red-glow-strong: rgba(255, 45, 85, 0.35);
       --font-display: 'Plus Jakarta Sans', sans-serif;
       --font-body: 'Plus Jakarta Sans', sans-serif;
       --font-mono: 'JetBrains Mono', monospace;
@@ -341,7 +342,7 @@
       animation: headingReveal 1s ease-out 0.4s both;
     }
     .hero h1 .accent {
-      background: linear-gradient(135deg, var(--red) 0%, #ff4466 50%, #ff6644 100%);
+      background: linear-gradient(135deg, #FF3B30 0%, #FF2D55 50%, #AF52DE 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
@@ -523,7 +524,7 @@
       border-radius: 12px;
       overflow: hidden;
       border: 1px solid var(--border);
-      box-shadow: 0 0 0 1px rgba(255,255,255,0.03), 0 20px 60px rgba(0,0,0,0.5), 0 0 120px rgba(255,0,51,0.03);
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.03), 0 20px 60px rgba(0,0,0,0.5), 0 0 120px rgba(255,45,85,0.03);
     }
     .demo-section .player-side { flex: 1; min-width: 0; background: var(--surface); display: flex; flex-direction: column; }
     .demo-section .video-area {
@@ -536,7 +537,7 @@
       content: '';
       position: absolute;
       inset: 0;
-      background: radial-gradient(ellipse 80% 60% at 50% 45%, rgba(255,0,51,0.04) 0%, transparent 70%), linear-gradient(180deg, transparent 60%, rgba(0,0,0,0.4) 100%);
+      background: radial-gradient(ellipse 80% 60% at 50% 45%, rgba(255,45,85,0.04) 0%, transparent 70%), linear-gradient(180deg, transparent 60%, rgba(0,0,0,0.4) 100%);
       z-index: 1;
     }
     .demo-section .fake-video-content {
@@ -557,9 +558,9 @@
     .demo-section .play-btn {
       position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 2;
       width: 64px; height: 64px; border-radius: 50%;
-      background: rgba(255,0,51,0.9);
+      background: rgba(255,45,85,0.9);
       display: flex; align-items: center; justify-content: center;
-      box-shadow: 0 4px 24px rgba(255,0,51,0.3);
+      box-shadow: 0 4px 24px rgba(255,45,85,0.3);
       animation: playPulse 3s ease-in-out infinite;
     }
     .demo-section .play-btn::after {
@@ -568,8 +569,8 @@
       border-color: transparent transparent transparent #fff; margin-left: 3px;
     }
     @keyframes playPulse {
-      0%, 100% { box-shadow: 0 4px 24px rgba(255,0,51,0.3); }
-      50% { box-shadow: 0 4px 40px rgba(255,0,51,0.5), 0 0 0 12px rgba(255,0,51,0.08); }
+      0%, 100% { box-shadow: 0 4px 24px rgba(255,45,85,0.3); }
+      50% { box-shadow: 0 4px 40px rgba(255,45,85,0.5), 0 0 0 12px rgba(255,45,85,0.08); }
     }
 
     .demo-section .progress-bar { position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background: rgba(255,255,255,0.1); z-index: 3; }
@@ -610,10 +611,10 @@
       font-size: 12px; font-weight: 600; cursor: default;
       transition: all 0.3s ease; border: 1px solid transparent; white-space: nowrap;
     }
-    .demo-section .sub-btn-transcript { background: var(--red); color: #fff; box-shadow: 0 2px 12px rgba(255,0,51,0.25); }
-    .demo-section .sub-btn-transcript.active { box-shadow: 0 2px 20px rgba(255,0,51,0.45); }
+    .demo-section .sub-btn-transcript { background: var(--red); color: #fff; box-shadow: 0 2px 12px rgba(255,45,85,0.25); }
+    .demo-section .sub-btn-transcript.active { box-shadow: 0 2px 20px rgba(255,45,85,0.45); }
     .demo-section .sub-btn-translate { background: var(--surface-3); color: var(--text-dim); border-color: var(--border); }
-    .demo-section .sub-btn-translate.active { color: var(--text); border-color: var(--red); box-shadow: 0 0 12px rgba(255,0,51,0.15); }
+    .demo-section .sub-btn-translate.active { color: var(--text); border-color: var(--red); box-shadow: 0 0 12px rgba(255,45,85,0.15); }
     .demo-section .sub-btn-icon { font-size: 13px; line-height: 1; }
     .demo-section .sub-btn-badge { font-family: var(--font-mono); font-size: 9px; background: rgba(255,255,255,0.1); padding: 2px 5px; border-radius: 3px; color: var(--text-dim); }
     .demo-section .sub-btn-transcript .sub-btn-badge { background: rgba(255,255,255,0.15); color: rgba(255,255,255,0.8); }
@@ -623,7 +624,7 @@
     .demo-section .video-meta-channel { font-size: 11px; color: var(--text-dim); display: flex; align-items: center; gap: 6px; }
     .demo-section .channel-dot {
       width: 20px; height: 20px; border-radius: 50%;
-      background: linear-gradient(135deg, var(--red), #cc0029);
+      background: linear-gradient(135deg, var(--red), var(--purple));
       display: inline-flex; align-items: center; justify-content: center;
       font-size: 8px; font-weight: 700; color: #fff;
     }
@@ -645,19 +646,19 @@
       font-family: var(--font-mono); font-size: 11px; outline: none; transition: border-color 0.3s;
     }
     .demo-section .search-input::placeholder { color: var(--text-muted); }
-    .demo-section .search-input.active { border-color: var(--red); box-shadow: 0 0 0 2px rgba(255,0,51,0.1); }
+    .demo-section .search-input.active { border-color: var(--red); box-shadow: 0 0 0 2px rgba(255,45,85,0.1); }
     .demo-section .search-icon { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 11px; pointer-events: none; }
     .demo-section .search-shortcut { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); font-family: var(--font-mono); font-size: 9px; color: var(--text-muted); background: var(--surface-3); padding: 1px 5px; border-radius: 3px; border: 1px solid var(--border); }
 
     .demo-section .transcript-list { flex: 1; overflow: hidden; padding: 6px 0; }
     .demo-section .transcript-entry { display: flex; gap: 8px; padding: 7px 14px; transition: background 0.2s; align-items: flex-start; }
-    .demo-section .transcript-entry.highlighted { background: rgba(255,0,51,0.06); }
-    .demo-section .transcript-entry.active { background: rgba(255,0,51,0.1); border-left: 2px solid var(--red); padding-left: 12px; }
+    .demo-section .transcript-entry.highlighted { background: rgba(255,45,85,0.06); }
+    .demo-section .transcript-entry.active { background: rgba(255,45,85,0.1); border-left: 2px solid var(--red); padding-left: 12px; }
     .demo-section .entry-time { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); min-width: 36px; padding-top: 1px; flex-shrink: 0; }
     .demo-section .transcript-entry.active .entry-time { color: var(--red); }
     .demo-section .entry-text { font-size: 12px; color: var(--text-dim); line-height: 1.45; }
     .demo-section .transcript-entry.active .entry-text { color: var(--text); }
-    .demo-section .fuzzy-match { background: rgba(255,0,51,0.2); color: var(--text); padding: 0 2px; border-radius: 2px; font-weight: 600; }
+    .demo-section .fuzzy-match { background: rgba(255,45,85,0.2); color: var(--text); padding: 0 2px; border-radius: 2px; font-weight: 600; }
 
     .demo-section .panel-tabs { display: flex; border-bottom: 1px solid var(--border); padding: 0 14px; }
     .demo-section .panel-tab { padding: 8px 12px; font-size: 11px; font-weight: 600; color: var(--text-muted); position: relative; transition: color 0.3s; }
@@ -673,7 +674,7 @@
     .demo-section .phase-step { display: flex; align-items: center; gap: 8px; font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); transition: color 0.5s; white-space: nowrap; }
     .demo-section .phase-step.active { color: var(--text); }
     .demo-section .phase-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--border-light); transition: background 0.5s, box-shadow 0.5s; }
-    .demo-section .phase-step.active .phase-dot { background: var(--red); box-shadow: 0 0 8px rgba(255,0,51,0.5); }
+    .demo-section .phase-step.active .phase-dot { background: var(--red); box-shadow: 0 0 8px rgba(255,45,85,0.5); }
     .demo-section .phase-arrow { color: var(--border-light); font-size: 10px; }
 
     /* ═══════════════════════════════════════
@@ -894,11 +895,12 @@
   <!-- ─── NAVIGATION ─── -->
   <nav>
     <a href="#" class="nav-brand">
-      <svg class="nav-logo" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <rect width="32" height="32" rx="8" fill="#FF0033"/>
-        <path d="M10 8h8a2 2 0 012 2v12a2 2 0 01-2 2H10a2 2 0 01-2-2V10a2 2 0 012-2z" fill="none" stroke="#fff" stroke-width="1.5"/>
-        <path d="M12 13h8M12 16h6M12 19h4" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/>
-        <path d="M20 14l4-4v12l-4-4" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <svg class="nav-logo" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+        <defs><linearGradient id="navGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#FF3B30"/><stop offset="50%" stop-color="#FF2D55"/><stop offset="100%" stop-color="#AF52DE"/></linearGradient></defs>
+        <rect width="512" height="512" rx="112" fill="#09090B"/>
+        <rect x="160" y="128" width="56" height="256" rx="28" fill="url(#navGrad)"/>
+        <rect x="240" y="176" width="56" height="160" rx="28" fill="url(#navGrad)"/>
+        <rect x="320" y="224" width="56" height="64" rx="28" fill="url(#navGrad)"/>
       </svg>
       <span class="nav-name">Sub<span>Scribe</span></span>
     </a>

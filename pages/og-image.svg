@@ -1,15 +1,20 @@
 <!-- Add to HTML head: <meta property="og:image" content="https://umitaltintas.github.io/subscribe/og-image.svg"> -->
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
   <defs>
+    <linearGradient id="brandGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FF3B30"/>
+      <stop offset="50%" stop-color="#FF2D55"/>
+      <stop offset="100%" stop-color="#AF52DE"/>
+    </linearGradient>
     <linearGradient id="redGlow" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#FF0033" stop-opacity="0.6"/>
-      <stop offset="100%" stop-color="#FF0033" stop-opacity="0"/>
+      <stop offset="0%" stop-color="#FF2D55" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#AF52DE" stop-opacity="0"/>
     </linearGradient>
     <linearGradient id="accentLine" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#FF0033" stop-opacity="0"/>
-      <stop offset="20%" stop-color="#FF0033" stop-opacity="1"/>
-      <stop offset="80%" stop-color="#FF0033" stop-opacity="1"/>
-      <stop offset="100%" stop-color="#FF0033" stop-opacity="0"/>
+      <stop offset="0%" stop-color="#FF3B30" stop-opacity="0"/>
+      <stop offset="20%" stop-color="#FF2D55" stop-opacity="1"/>
+      <stop offset="80%" stop-color="#AF52DE" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#AF52DE" stop-opacity="0"/>
     </linearGradient>
     <filter id="glow">
       <feGaussianBlur stdDeviation="20" result="blur"/>
@@ -30,55 +35,43 @@
   </pattern>
   <rect width="1200" height="630" fill="url(#grid)"/>
 
-  <!-- Red glow blob top-right -->
+  <!-- Red-purple glow blob top-right -->
   <ellipse cx="950" cy="120" rx="300" ry="200" fill="url(#redGlow)" opacity="0.4"/>
 
-  <!-- Red glow blob bottom-left -->
+  <!-- Purple glow blob bottom-left -->
   <ellipse cx="250" cy="520" rx="250" ry="150" fill="url(#redGlow)" opacity="0.25"/>
 
-  <!-- Transcript/document icon -->
-  <g transform="translate(480, 140)">
-    <!-- Document body -->
-    <rect x="0" y="0" width="80" height="100" rx="8" ry="8" fill="none" stroke="#FF0033" stroke-width="3" opacity="0.9"/>
-    <!-- Folded corner -->
-    <path d="M 56 0 L 80 24" fill="none" stroke="#FF0033" stroke-width="3" opacity="0.9"/>
-    <path d="M 56 0 L 56 24 L 80 24" fill="#FF0033" opacity="0.15" stroke="#FF0033" stroke-width="2"/>
-    <!-- Text lines -->
-    <line x1="16" y1="40" x2="64" y2="40" stroke="#FF0033" stroke-width="3" stroke-linecap="round" opacity="0.7"/>
-    <line x1="16" y1="54" x2="52" y2="54" stroke="#FF0033" stroke-width="3" stroke-linecap="round" opacity="0.5"/>
-    <line x1="16" y1="68" x2="58" y2="68" stroke="#FF0033" stroke-width="3" stroke-linecap="round" opacity="0.7"/>
-    <line x1="16" y1="82" x2="42" y2="82" stroke="#FF0033" stroke-width="3" stroke-linecap="round" opacity="0.5"/>
-  </g>
-
-  <!-- CC (closed caption) badge on document -->
-  <g transform="translate(540, 200)">
-    <rect x="0" y="0" width="36" height="22" rx="4" ry="4" fill="#FF0033" opacity="0.9"/>
-    <text x="18" y="16" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="13" font-weight="bold" fill="#ffffff">CC</text>
+  <!-- Logo icon (three bars) -->
+  <g transform="translate(510, 100)">
+    <rect width="180" height="180" rx="40" fill="#09090B" stroke="#222" stroke-width="1"/>
+    <rect x="48" y="36" width="20" height="108" rx="10" fill="url(#brandGrad)"/>
+    <rect x="80" y="52" width="20" height="76" rx="10" fill="url(#brandGrad)"/>
+    <rect x="112" y="68" width="20" height="44" rx="10" fill="url(#brandGrad)"/>
   </g>
 
   <!-- Title: SubScribe -->
-  <text x="600" y="320" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="82" font-weight="bold" fill="#ffffff" letter-spacing="2">
+  <text x="600" y="350" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="82" font-weight="bold" fill="#ffffff" letter-spacing="2">
     SubScribe
   </text>
 
-  <!-- Red underline accent -->
-  <rect x="350" y="340" width="500" height="3" rx="2" fill="url(#accentLine)"/>
+  <!-- Red-purple underline accent -->
+  <rect x="350" y="370" width="500" height="3" rx="2" fill="url(#accentLine)"/>
 
   <!-- Subtitle -->
-  <text x="600" y="395" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="30" fill="#888888" letter-spacing="4">
+  <text x="600" y="425" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="30" fill="#888888" letter-spacing="4">
     YouTube Transcript Manager
   </text>
 
   <!-- Feature list -->
-  <text x="600" y="480" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="20" fill="#666666" letter-spacing="3">
+  <text x="600" y="490" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="20" fill="#666666" letter-spacing="3">
     Extract &#x2022; Search &#x2022; Translate &#x2022; Overlay
   </text>
 
   <!-- Userscript badge -->
-  <g transform="translate(510, 510)">
-    <rect x="0" y="0" width="180" height="30" rx="15" fill="#FF0033" opacity="0.12"/>
-    <rect x="0" y="0" width="180" height="30" rx="15" fill="none" stroke="#FF0033" stroke-width="1" opacity="0.3"/>
-    <text x="90" y="20" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#FF0033" letter-spacing="2" opacity="0.8">USERSCRIPT</text>
+  <g transform="translate(510, 520)">
+    <rect x="0" y="0" width="180" height="30" rx="15" fill="#FF2D55" opacity="0.12"/>
+    <rect x="0" y="0" width="180" height="30" rx="15" fill="none" stroke="#FF2D55" stroke-width="1" opacity="0.3"/>
+    <text x="90" y="20" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="13" fill="#FF2D55" letter-spacing="2" opacity="0.8">USERSCRIPT</text>
   </g>
 
   <!-- Thin border -->

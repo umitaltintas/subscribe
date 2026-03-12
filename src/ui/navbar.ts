@@ -54,10 +54,12 @@ export const injectNavbarButton = (): void => {
   setHTML(
     btn,
     `
-    <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/>
-      <path d="M14 2v4a2 2 0 0 0 2 2h4"/>
-      <path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>
+    <svg viewBox="0 0 512 512" width="24" height="24" xmlns="http://www.w3.org/2000/svg">
+      <defs><linearGradient id="ytcGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#FF3B30"/><stop offset="50%" stop-color="#FF2D55"/><stop offset="100%" stop-color="#AF52DE"/></linearGradient></defs>
+      <rect width="512" height="512" rx="112" fill="#09090B"/>
+      <rect x="160" y="128" width="56" height="256" rx="28" fill="url(#ytcGrad)"/>
+      <rect x="240" y="176" width="56" height="160" rx="28" fill="url(#ytcGrad)"/>
+      <rect x="320" y="224" width="56" height="64" rx="28" fill="url(#ytcGrad)"/>
     </svg>
     <span class="ytc-badge" style="display:none">0</span>
   `,
