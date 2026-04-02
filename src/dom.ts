@@ -1,6 +1,8 @@
 import { esc } from "./utils";
 import { icons } from "./icons";
 import { sanitize } from "./trusted-types";
+import { CONFIG } from "./config";
+import type { SummaryOptions } from "./types";
 
 export const $ = (sel: string): Element | null => document.querySelector(sel);
 export const $$ = (sel: string): NodeListOf<Element> =>
@@ -157,6 +159,15 @@ export const injectStyles = (): void => {
     .ytc-spinner{width:24px;height:24px;border:3px solid var(--ytc-border);border-top-color:var(--ytc-primary);border-radius:50%;animation:ytc-spin .8s linear infinite;margin-right:12px}
     @keyframes ytc-spin{to{transform:rotate(360deg)}}
 
+    .ytc-summary-opts{display:flex;flex-direction:column;gap:16px}
+    .ytc-summary-opts .ytc-opt-group{display:flex;flex-direction:column;gap:6px}
+    .ytc-summary-opts .ytc-opt-label{font-size:12px;font-weight:600;color:var(--ytc-muted);text-transform:uppercase;letter-spacing:.5px}
+    .ytc-summary-opts .ytc-opt-chips{display:flex;flex-wrap:wrap;gap:6px}
+    .ytc-opt-chip{padding:6px 12px;border-radius:16px;border:1px solid var(--ytc-border);background:rgba(255,255,255,.05);color:var(--ytc-muted);font-size:13px;cursor:pointer;transition:all .15s;white-space:nowrap}
+    .ytc-opt-chip:hover{background:rgba(255,255,255,.1);color:#fff}
+    .ytc-opt-chip.active{background:rgba(62,166,255,.2);border-color:var(--ytc-primary);color:var(--ytc-primary)}
+    .ytc-opt-chip-desc{display:block;font-size:11px;color:var(--ytc-muted);margin-top:2px}
+
     @media(max-width:600px){
       .ytc-item{flex-direction:column}
       .ytc-thumb{width:100%;height:auto;aspect-ratio:16/9}
@@ -168,4 +179,91 @@ export const injectStyles = (): void => {
   document.head.appendChild(
     Object.assign(document.createElement("style"), { textContent: css }),
   );
+};
+
+export const showSummaryOptionsPopover = (): Promise<SummaryOptions | null> => {
+  return new Promise((resolve) => {
+    ($(".ytc-summary-opts-modal") as HTMLElement)?.remove();
+
+    const formats = CONFIG.AI.SUMMARY_FORMATS;
+    const tones = CONFIG.AI.SUMMARY_TONES;
+    const lengths = CONFIG.AI.SUMMARY_LENGTHS;
+
+    const state: SummaryOptions = { format: "structured", tone: "neutral", length: "medium" };
+
+    const modal = document.createElement("div");
+    modal.className = "ytc-modal-bg ytc-summary-opts-modal";
+
+    setHTML(modal, `
+      <div class="ytc-modal" style="width:min(480px,95vw)">
+        <div class="ytc-modal-header">
+          <h2>${icons.sparkles} Özet Seçenekleri</h2>
+          <button class="ytc-modal-close">${icons.x}</button>
+        </div>
+        <div class="ytc-modal-body" style="padding:20px">
+          <div class="ytc-summary-opts">
+            <div class="ytc-opt-group">
+              <span class="ytc-opt-label">Format</span>
+              <div class="ytc-opt-chips" data-group="format">
+                ${formats.map((f) => `<button class="ytc-opt-chip${f.id === state.format ? " active" : ""}" data-value="${f.id}" title="${esc(f.description)}">${esc(f.name)}</button>`).join("")}
+              </div>
+            </div>
+            <div class="ytc-opt-group">
+              <span class="ytc-opt-label">Ton</span>
+              <div class="ytc-opt-chips" data-group="tone">
+                ${tones.map((t) => `<button class="ytc-opt-chip${t.id === state.tone ? " active" : ""}" data-value="${t.id}">${esc(t.name)}</button>`).join("")}
+              </div>
+            </div>
+            <div class="ytc-opt-group">
+              <span class="ytc-opt-label">Uzunluk</span>
+              <div class="ytc-opt-chips" data-group="length">
+                ${lengths.map((l) => `<button class="ytc-opt-chip${l.id === state.length ? " active" : ""}" data-value="${l.id}">${esc(l.name)}</button>`).join("")}
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="ytc-modal-footer">
+          <button class="ytc-btn secondary" data-action="cancel">Vazgeç</button>
+          <button class="ytc-btn" data-action="start">${icons.sparkles} Özetle</button>
+        </div>
+      </div>
+    `);
+
+    document.body.appendChild(modal);
+
+    const close = (result: SummaryOptions | null) => {
+      modal.remove();
+      document.removeEventListener("keydown", keyHandler);
+      resolve(result);
+    };
+
+    const keyHandler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") close(null);
+    };
+    document.addEventListener("keydown", keyHandler);
+
+    modal.addEventListener("click", (e) => {
+      const target = e.target as HTMLElement;
+
+      if (target === modal || target.closest(".ytc-modal-close") || target.closest('[data-action="cancel"]')) {
+        close(null);
+        return;
+      }
+
+      const chip = target.closest(".ytc-opt-chip") as HTMLElement | null;
+      if (chip) {
+        const group = chip.closest("[data-group]") as HTMLElement;
+        const groupName = group.dataset.group as keyof SummaryOptions;
+        const value = chip.dataset.value!;
+        (state as unknown as Record<string, string>)[groupName] = value;
+        group.querySelectorAll(".ytc-opt-chip").forEach((c) => c.classList.remove("active"));
+        chip.classList.add("active");
+        return;
+      }
+
+      if (target.closest('[data-action="start"]')) {
+        close({ ...state });
+      }
+    });
+  });
 };

@@ -1,4 +1,4 @@
-import { $, setHTML, showToast } from "../dom";
+import { $, setHTML, showToast, showSummaryOptionsPopover } from "../dom";
 import { esc, truncate, formatDate, mdToHtml } from "../utils";
 import { icons } from "../icons";
 import { CONFIG } from "../config";
@@ -177,27 +177,22 @@ export const showTranscriptViewer = (
     if (target.closest('[data-action="summarize"]')) {
       const summarizeBtn = modal.querySelector("#ytc-summarize-btn") as HTMLButtonElement;
 
-      // Check if summary already exists
-      if (currentRecord.userSummary) {
-        const transcriptEl = modal.querySelector("#ytc-viewer-transcript") as HTMLElement;
-        const htmlContent = mdToHtml(currentRecord.userSummary);
-        setHTML(transcriptEl, htmlContent);
-        showToast("Mevcut özet gösteriliyor");
-        return;
-      }
-
       const settings = db.getAISettings();
       if (!settings?.apiKey) {
         showToast("Lütfen önce AI ayarlarını yapılandırın", "error");
         return;
       }
 
+      // Show options popover
+      const options = await showSummaryOptionsPopover();
+      if (!options) return;
+
       summarizeBtn.disabled = true;
       const origText = summarizeBtn.innerHTML;
 
       try {
         setHTML(summarizeBtn, `${icons.sparkles} Özetleniyor...`);
-        const summary = await summarizeForUser(currentRecord.transcript, settings);
+        const summary = await summarizeForUser(currentRecord.transcript, settings, undefined, options);
 
         await db.update(currentRecord.id, { userSummary: summary });
         currentRecord = { ...currentRecord, userSummary: summary };

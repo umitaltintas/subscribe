@@ -78,6 +78,16 @@ export interface AISettings {
   targetLanguage: string;
 }
 
+export type SummaryFormat = "structured" | "bullets" | "paragraph" | "tldr";
+export type SummaryTone = "neutral" | "simple" | "technical" | "academic" | "casual";
+export type SummaryLength = "short" | "medium" | "long";
+
+export interface SummaryOptions {
+  format: SummaryFormat;
+  tone: SummaryTone;
+  length: SummaryLength;
+}
+
 export interface SubtitleCue {
   startTime: number;
   endTime: number;

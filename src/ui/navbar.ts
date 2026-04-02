@@ -1,4 +1,4 @@
-import { $, $$, setHTML, injectStyles, showToast } from "../dom";
+import { $, $$, setHTML, injectStyles, showToast, showSummaryOptionsPopover } from "../dom";
 import { sleep, mdToHtml } from "../utils";
 import { icons } from "../icons";
 import { db } from "../db";
@@ -315,20 +315,13 @@ export const injectVideoButton = (): void => {
       }
 
       if (summarizing) return;
+
+      // Show options popover first
+      const options = await showSummaryOptionsPopover();
+      if (!options) return;
+
       summarizing = true;
       setHTML(summarizeBtn, `${icons.sparkles} Özetleniyor...`);
-
-      // Check DB for existing summary
-      const videoId = getVideoInfo().id;
-      if (videoId) {
-        const record = await db.get(videoId);
-        if (record?.userSummary) {
-          showSummaryModal(record.userSummary);
-          summarizing = false;
-          setHTML(summarizeBtn, `${icons.sparkles} Özetle`);
-          return;
-        }
-      }
 
       const opened = await openTranscript();
       if (!opened) {
@@ -353,9 +346,10 @@ export const injectVideoButton = (): void => {
       try {
         const summary = await summarizeForUser(transcript, settings, () => {
           setHTML(summarizeBtn, `${icons.sparkles} Analiz ediliyor...`);
-        });
+        }, options);
 
         // Save to DB
+        const videoId = getVideoInfo().id;
         if (videoId) {
           try {
             const existing = await db.get(videoId);

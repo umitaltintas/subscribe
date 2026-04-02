@@ -1,5 +1,5 @@
 import { CONFIG } from "./config";
-import type { AISettings, SubtitleCue } from "./types";
+import type { AISettings, SubtitleCue, SummaryOptions } from "./types";
 
 export const parseTimestampedTranscript = (text: string): SubtitleCue[] => {
   const lines = text.split("\n").filter((l) => l.trim());
@@ -224,10 +224,61 @@ const cleanTranscript = (text: string): string => {
     .join("\n");
 };
 
+const buildSummaryPrompt = (options?: SummaryOptions): string => {
+  const format = options?.format ?? "structured";
+  const tone = options?.tone ?? "neutral";
+  const length = options?.length ?? "medium";
+
+  const formatInstructions: Record<string, string> = {
+    structured: `Your summary should include:
+1. **Ana Konu**: A one-line description of what the video is about
+2. **Önemli Noktalar**: Key points and takeaways (bullet points)
+3. **Sonuç**: Brief conclusion or final thoughts
+
+Use markdown-style formatting with headers and bullet points.`,
+    bullets: `Present the summary as a clean bullet-point list.
+- Start with a one-line topic sentence
+- Then list all key points as bullet items
+- No headers, no paragraphs — only bullet points`,
+    paragraph: `Write the summary as flowing, well-structured paragraphs.
+- No bullet points or numbered lists
+- Use natural paragraph breaks between ideas
+- Write in a narrative style`,
+    tldr: `Write an ultra-short TL;DR summary in 2-3 sentences maximum.
+- Capture only the single most important takeaway
+- Be extremely concise`,
+  };
+
+  const toneInstructions: Record<string, string> = {
+    neutral: "",
+    simple: "Use simple, easy-to-understand language. Avoid jargon and technical terms. Explain as if to someone unfamiliar with the topic.",
+    technical: "Use precise technical language and domain-specific terminology. Be exact and detailed in descriptions.",
+    academic: "Use formal academic language. Structure the analysis rigorously with clear logical flow.",
+    casual: "Use a friendly, conversational tone. Keep it relaxed and approachable, like explaining to a friend.",
+  };
+
+  const lengthInstructions: Record<string, string> = {
+    short: "Keep the summary brief — aim for roughly 3-5 bullet points or 1-2 short paragraphs.",
+    medium: "Provide a balanced summary — aim for roughly 5-8 bullet points or 2-3 paragraphs.",
+    long: "Provide a comprehensive, detailed summary — cover all significant points, examples, and nuances discussed in the video.",
+  };
+
+  let prompt = `You are a skilled content analyst. Summarize the following video transcript in the same language as the transcript.\n\n`;
+  prompt += formatInstructions[format] + "\n\n";
+  prompt += lengthInstructions[length] + "\n";
+  if (toneInstructions[tone]) {
+    prompt += "\nTone: " + toneInstructions[tone] + "\n";
+  }
+  prompt += "\nOutput ONLY the summary. No meta-commentary.";
+
+  return prompt;
+};
+
 export const summarizeForUser = async (
   transcript: string,
   settings: AISettings,
   onProgress?: (stage: string) => void,
+  options?: SummaryOptions,
 ): Promise<string> => {
   onProgress?.("analyzing");
   const cleaned = cleanTranscript(transcript);
@@ -244,15 +295,7 @@ export const summarizeForUser = async (
       messages: [
         {
           role: "system",
-          content: `You are a skilled content analyst. Summarize the following video transcript in the same language as the transcript.
-
-Your summary should include:
-1. **Ana Konu**: A one-line description of what the video is about
-2. **Önemli Noktalar**: Key points and takeaways (bullet points)
-3. **Sonuç**: Brief conclusion or final thoughts
-
-Keep it concise but informative. Use markdown-style formatting with headers and bullet points.
-Output ONLY the summary. No meta-commentary.`,
+          content: buildSummaryPrompt(options),
         },
         {
           role: "user",

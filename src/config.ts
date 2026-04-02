@@ -22,6 +22,24 @@ export const CONFIG = {
       { code: "ru", name: "Русский" },
     ],
     OPENROUTER_URL: "https://openrouter.ai/api/v1/chat/completions",
+    SUMMARY_FORMATS: [
+      { id: "structured", name: "Yapılandırılmış", description: "Ana konu, önemli noktalar ve sonuç" },
+      { id: "bullets", name: "Madde İşaretli", description: "Sadece madde işaretli liste" },
+      { id: "paragraph", name: "Paragraf", description: "Akıcı paragraf formatında" },
+      { id: "tldr", name: "TL;DR", description: "2-3 cümlelik ultra kısa özet" },
+    ] as const,
+    SUMMARY_TONES: [
+      { id: "neutral", name: "Nötr" },
+      { id: "simple", name: "Basit / Sade" },
+      { id: "technical", name: "Teknik" },
+      { id: "academic", name: "Akademik" },
+      { id: "casual", name: "Günlük / Samimi" },
+    ] as const,
+    SUMMARY_LENGTHS: [
+      { id: "short", name: "Kısa" },
+      { id: "medium", name: "Orta" },
+      { id: "long", name: "Detaylı" },
+    ] as const,
   },
   FUSE_OPTIONS: {
     keys: [
