@@ -76,7 +76,7 @@ export const getTranscriptText = (withTimestamps: boolean): string => {
       .map((seg) => {
         const text =
           seg.querySelector(
-            ".yt-core-attributed-string, yt-core-attributed-string span",
+            'span[role="text"], .ytAttributedStringHost, .yt-core-attributed-string, yt-core-attributed-string span',
           )?.textContent?.trim() || "";
         if (!text) return "";
         if (!withTimestamps) return text;
