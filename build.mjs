@@ -3,7 +3,7 @@ import { build, context } from "esbuild";
 const USERSCRIPT_HEADER = `// ==UserScript==
 // @name         SubScribe - YouTube Transcript Manager
 // @namespace    http://tampermonkey.net/
-// @version      1.4.0
+// @version      1.4.1
 // @description  YouTube transcript manager with fuzzy search, AI translation, AI summarization, and subtitle overlay
 // @author       umitaltintas
 // @homepage     https://github.com/umitaltintas/subscribe
