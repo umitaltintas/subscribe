@@ -63,3 +63,34 @@ export const formatDate = (iso: string): string => {
 
 export const truncate = (str: string, len: number): string =>
   str.length > len ? str.slice(0, len) + "..." : str;
+
+const escapeRegExp = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * Escapes `text` for HTML and wraps every search term in <mark>. Terms are
+ * matched literally, and never inside HTML entities produced by escaping.
+ */
+export const highlight = (text: string, query: string): string => {
+  const html = esc(text);
+  const terms = query
+    .split(/\s+/)
+    .map((t) => t.trim())
+    .filter((t) => t.length >= 2)
+    .map((t) => escapeRegExp(esc(t)));
+  if (!terms.length) return html;
+  const re = new RegExp(`(&(?:[a-z]+|#\\d+);)|(${terms.join("|")})`, "gi");
+  return html.replace(re, (m, entity) => (entity ? m : `<mark class="ytc-mark">${m}</mark>`));
+};
+
+export const downloadText = (filename: string, content: string, type = "text/plain"): void => {
+  const url = URL.createObjectURL(new Blob([content], { type: `${type};charset=utf-8` }));
+  const a = Object.assign(document.createElement("a"), { href: url, download: filename });
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+
+/** File-system-safe name from a video title. */
+export const safeFilename = (s: string): string =>
+  s.replace(/[\\/:*?"<>|]+/g, "").replace(/\s+/g, " ").trim().slice(0, 80) || "video";

@@ -1,6 +1,6 @@
 {
   "name": "subscribe-userscript",
-  "version": "1.4.1",
+  "version": "1.5.0",
   "description": "YouTube transcript manager userscript with fuzzy search, AI translation, AI summarization, and subtitle overlay",
   "author": "umitaltintas",
   "license": "MIT",
@@ -25,7 +25,8 @@
   "scripts": {
     "build": "node build.mjs",
     "watch": "node build.mjs --watch",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "bun test"
   },
   "devDependencies": {
     "@types/dompurify": "^3.0.5",

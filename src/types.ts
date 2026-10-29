@@ -6,6 +6,10 @@ export interface TranscriptRecord {
   duration: string;
   transcript: string;
   format: "text" | "time";
+  /** Timestamped copy, kept when `transcript` was saved as plain text. */
+  timedTranscript?: string;
+  /** Caption fragments with millisecond timing from YouTube's player. */
+  captionSegments?: { start: number; end: number; text: string }[];
   date: string;
   favorite: boolean;
   tags: string[];
@@ -13,8 +17,11 @@ export interface TranscriptRecord {
   words: number;
   chars: number;
   tokens: number;
+  /** Language code → translated transcript as "[m:ss] text" lines. */
   translations?: Record<string, string>;
+  /** Short context summary generated during translation. */
   summary?: string;
+  /** Summary the user explicitly asked for. */
   userSummary?: string;
 }
 
@@ -78,6 +85,25 @@ export interface AISettings {
   targetLanguage: string;
 }
 
+export interface SubtitleSettings {
+  /** Font scale in percent (100 = default). */
+  scale: number;
+  color: "yellow" | "white";
+  /** Background opacity, 0–1. */
+  background: number;
+  /** Show the original line under the translation. */
+  bilingual: boolean;
+  /** Seconds to delay (+) or advance (−) subtitles. */
+  offset: number;
+}
+
+export interface AppSettings extends AISettings {
+  /** "auto" = same language as the video, otherwise a language code. */
+  summaryLanguage: string;
+  subtitles: SubtitleSettings;
+  lastSummaryOptions?: SummaryOptions;
+}
+
 export type SummaryFormat = "structured" | "bullets" | "paragraph" | "tldr";
 export type SummaryTone = "neutral" | "simple" | "technical" | "academic" | "casual";
 export type SummaryLength = "short" | "medium" | "long";
@@ -86,10 +112,21 @@ export interface SummaryOptions {
   format: SummaryFormat;
   tone: SummaryTone;
   length: SummaryLength;
+  /** "auto" = same language as the video. */
+  language?: string;
 }
 
 export interface SubtitleCue {
   startTime: number;
   endTime: number;
   text: string;
+  /** Original-language text for the same time range (bilingual mode). */
+  original?: string;
+}
+
+export interface Usage {
+  promptTokens: number;
+  completionTokens: number;
+  /** USD, 0 when the provider did not report it. */
+  cost: number;
 }

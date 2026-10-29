@@ -123,10 +123,12 @@ const extractSegmentTimestamp = (seg: Element): string => {
 };
 
 export const getTranscriptText = (withTimestamps: boolean): string => {
-  const seen = new Set<string>();
+  // YouTube's DOM sometimes repeats a segment; drop consecutive duplicates
+  // only, so legitimately repeated lines ("[Music]", "Yeah.") survive.
+  let prev = "";
   const dedup = (line: string): boolean => {
-    if (!line || seen.has(line)) return false;
-    seen.add(line);
+    if (!line || line === prev) return false;
+    prev = line;
     return true;
   };
 
@@ -149,4 +151,24 @@ export const getTranscriptText = (withTimestamps: boolean): string => {
     })
     .filter(dedup)
     .join("\n");
+};
+
+/**
+ * Opens YouTube's transcript panel and reads it with timestamps.
+ * Throws if the user navigated away from `expectedVideoId` meanwhile.
+ */
+export const fetchTimedTranscript = async (expectedVideoId: string): Promise<string> => {
+  const assertSameVideo = () => {
+    if (getVideoInfo().id !== expectedVideoId) throw new Error("Video değişti, işlem durduruldu");
+  };
+  assertSameVideo();
+  const opened = await openTranscript();
+  if (!opened) throw new Error("Bu videoda transkript bulunamadı");
+  for (let attempt = 0; attempt < 12; attempt++) {
+    assertSameVideo();
+    const text = getTranscriptText(true);
+    if (text) return text;
+    await sleep(400);
+  }
+  throw new Error("Transkript yüklenemedi");
 };

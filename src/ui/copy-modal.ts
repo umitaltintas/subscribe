@@ -1,180 +1,144 @@
-import { $, setHTML, injectStyles, showToast } from "../dom";
+import { setHTML, showToast } from "../dom";
 import { esc, countStats } from "../utils";
 import { icons } from "../icons";
 import { db } from "../db";
 import { getVideoInfo, getTranscriptText } from "../transcript";
-import { updateNavbarBadge } from "./navbar";
+import { updateNavbarBadge, refreshVideoActions } from "./navbar";
+import { openModal } from "./modal";
 
 export const showCopyModal = async (): Promise<void> => {
-  injectStyles();
-  ($(".ytc-modal-bg") as HTMLElement)?.remove();
-
   const videoInfo = getVideoInfo();
   const existing = await db.get(videoInfo.id);
+  const lastFormat = existing?.format ?? "text";
 
-  const bg = document.createElement("div");
-  bg.className = "ytc-modal-bg";
-  setHTML(
-    bg,
-    `
-    <div class="ytc-modal" style="width:min(600px,95vw)">
-      <div class="ytc-modal-header">
-        <h2>${icons.clipboard} Transkript Kopyala</h2>
-        <button class="ytc-modal-close">${icons.x}</button>
-      </div>
-      <div class="ytc-modal-body" style="padding:20px">
-        <div class="ytc-section">
-          <div class="ytc-section-title">${icons.fileText} Format</div>
-          <div class="ytc-options">
-            <label class="ytc-option selected">
-              <input type="radio" name="fmt" value="text" checked>
-              <div class="ytc-option-text">
-                <div class="ytc-option-title">${icons.text} Sadece metin</div>
-                <div class="ytc-option-desc">Temiz metin, zaman damgası olmadan</div>
-              </div>
-            </label>
-            <label class="ytc-option">
-              <input type="radio" name="fmt" value="time">
-              <div class="ytc-option-text">
-                <div class="ytc-option-title">${icons.timer} Zaman damgalı</div>
-                <div class="ytc-option-desc">[00:00] formatında zaman bilgisi ile</div>
-              </div>
-            </label>
-          </div>
-        </div>
-
-        <div class="ytc-section">
-          <div class="ytc-section-title">${icons.tag} Etiketler (opsiyonel)</div>
-          <div class="ytc-tags-input" style="position:relative">
-            <div class="ytc-selected-tags"></div>
-            <input type="text" placeholder="Etiket ekle... (Enter ile)" id="ytc-tag-input">
-          </div>
-          <div style="font-size:12px;color:var(--ytc-muted);margin-top:6px">Örnek: eğitim, programlama, türkçe</div>
-        </div>
-
-        <div class="ytc-section">
-          <label class="ytc-option" style="padding:10px 14px">
-            <input type="checkbox" id="ytc-favorite" ${existing?.favorite ? "checked" : ""}>
+  const m = openModal({
+    id: "ytc-copy-modal",
+    width: 560,
+    title: `${icons.clipboard} Transkripti kopyala`,
+    body: `<div class="ytc-pad">
+      <div class="ytc-section">
+        <div class="ytc-section-title">${icons.fileText} Format</div>
+        <div class="ytc-options" role="radiogroup">
+          <label class="ytc-option">
+            <input type="radio" name="fmt" value="text" ${lastFormat === "text" ? "checked" : ""}>
             <div class="ytc-option-text">
-              <div class="ytc-option-title">${icons.star} Favorilere ekle</div>
+              <div class="ytc-option-title">${icons.text} Sadece metin</div>
+              <div class="ytc-option-desc">Temiz metin; LLM'lere yapıştırmak için ideal</div>
+            </div>
+          </label>
+          <label class="ytc-option">
+            <input type="radio" name="fmt" value="time" ${lastFormat === "time" ? "checked" : ""}>
+            <div class="ytc-option-text">
+              <div class="ytc-option-title">${icons.timer} Zaman damgalı</div>
+              <div class="ytc-option-desc">[0:00] formatında, her satır zaman bilgisiyle</div>
             </div>
           </label>
         </div>
+        <div class="ytc-help">${icons.info} Çeviri ve altyazı için zaman damgaları her iki durumda da saklanır.</div>
       </div>
-      <div class="ytc-modal-footer">
-        <button class="ytc-btn secondary" data-action="cancel">Vazgeç</button>
-        ${existing ? `<button class="ytc-btn secondary" data-action="recopy">${icons.refreshCw} Tekrar Kopyala</button>` : ""}
-        <button class="ytc-btn" data-action="copy">${icons.clipboard} Kopyala ve Kaydet</button>
+
+      <div class="ytc-section">
+        <label class="ytc-section-title" for="ytc-tag-input">${icons.tag} Etiketler <span style="text-transform:none;font-weight:400">(isteğe bağlı)</span></label>
+        <div class="ytc-tags-input">
+          <div class="ytc-selected-tags"></div>
+          <input type="text" placeholder="Etiket yazıp Enter'a basın" id="ytc-tag-input" list="ytc-tag-suggestions" autocomplete="off">
+          <datalist id="ytc-tag-suggestions"></datalist>
+        </div>
       </div>
-    </div>
-  `,
-  );
 
-  document.body.appendChild(bg);
-
-  const options = bg.querySelectorAll(".ytc-option");
-  const tagInput = bg.querySelector("#ytc-tag-input") as HTMLInputElement;
-  const selectedTagsEl = bg.querySelector(
-    ".ytc-selected-tags",
-  ) as HTMLElement;
-
-  let selectedTags = existing?.tags ? [...existing.tags] : [];
-
-  options.forEach((opt) => {
-    opt.addEventListener("click", () => {
-      const radio = opt.querySelector(
-        'input[type="radio"]',
-      ) as HTMLInputElement | null;
-      if (radio) {
-        options.forEach((o) => o.classList.remove("selected"));
-        opt.classList.add("selected");
-        radio.checked = true;
-      }
-    });
+      <div class="ytc-section" style="margin-bottom:0">
+        <label class="ytc-option" style="padding:10px 14px">
+          <input type="checkbox" id="ytc-favorite" ${existing?.favorite ? "checked" : ""}>
+          <div class="ytc-option-text"><div class="ytc-option-title">${icons.star} Favorilere ekle</div></div>
+        </label>
+      </div>
+    </div>`,
+    footer: `${existing ? `<span class="ytc-help" style="margin:0">${icons.check} Bu video kütüphanede kayıtlı</span>` : ""}
+      <span class="ytc-footer-spacer"></span>
+      <button class="ytc-btn secondary" data-action="cancel">Vazgeç</button>
+      <button class="ytc-btn primary" data-action="copy">${icons.clipboard} ${existing ? "Kopyala ve güncelle" : "Kopyala ve kaydet"}</button>`,
   });
 
-  const renderTags = () => {
+  const tagInput = m.dialog.querySelector("#ytc-tag-input") as HTMLInputElement;
+  const selectedTagsEl = m.dialog.querySelector(".ytc-selected-tags") as HTMLElement;
+  let selectedTags = existing?.tags ? [...existing.tags] : [];
+
+  void db.getAllTags().then((tags) =>
+    setHTML(
+      m.dialog.querySelector("#ytc-tag-suggestions")!,
+      tags.map((t) => `<option value="${esc(t)}"></option>`).join(""),
+    ),
+  );
+
+  const renderTags = () =>
     setHTML(
       selectedTagsEl,
       selectedTags
-        .map(
-          (t) =>
-            `<span class="ytc-tag removable" data-tag="${esc(t)}">${esc(t)} ${icons.x}</span>`,
-        )
+        .map((t) => `<button class="ytc-tag removable" data-tag="${esc(t)}" aria-label="${esc(t)} etiketini kaldır">${esc(t)} ${icons.x}</button>`)
         .join(""),
     );
-  };
-
   renderTags();
 
-  selectedTagsEl.addEventListener("click", (e) => {
-    const tag = (e.target as HTMLElement).closest("[data-tag]") as HTMLElement | null;
-    if (tag?.dataset.tag) {
-      selectedTags = selectedTags.filter((t) => t !== tag.dataset.tag);
+  const addTag = () => {
+    const tag = tagInput.value.trim().toLowerCase().replace(/,+$/, "");
+    if (tag && !selectedTags.includes(tag)) {
+      selectedTags.push(tag);
+      renderTags();
+    }
+    tagInput.value = "";
+  };
+
+  tagInput.addEventListener("keydown", (e) => {
+    if ((e.key === "Enter" || e.key === ",") && tagInput.value.trim()) {
+      e.preventDefault();
+      addTag();
+    } else if (e.key === "Backspace" && !tagInput.value && selectedTags.length) {
+      selectedTags.pop();
       renderTags();
     }
   });
 
-  tagInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && tagInput.value.trim()) {
-      e.preventDefault();
-      const tag = tagInput.value.trim().toLowerCase();
-      if (!selectedTags.includes(tag)) {
-        selectedTags.push(tag);
-        renderTags();
-      }
-      tagInput.value = "";
-    }
-  });
-
-  const close = () => bg.remove();
-
   const doCopy = async () => {
-    const fmt = (
-      bg.querySelector('input[name="fmt"]:checked') as HTMLInputElement
-    ).value;
-    const favorite = (
-      bg.querySelector("#ytc-favorite") as HTMLInputElement
-    ).checked;
+    if (tagInput.value.trim()) addTag();
+    const fmt = (m.dialog.querySelector('input[name="fmt"]:checked') as HTMLInputElement).value as "text" | "time";
+    const favorite = (m.dialog.querySelector("#ytc-favorite") as HTMLInputElement).checked;
     const text = getTranscriptText(fmt === "time");
+    if (!text) return showToast("Transkript okunamadı, paneli açıp tekrar deneyin", "error");
+    const timed = fmt === "time" ? text : getTranscriptText(true);
     const stats = countStats(text);
 
-    const record = {
+    // Merge in one transaction against the *current* record: a translation or
+    // summary may have been saved while this dialog was open.
+    const current = await db.get(videoInfo.id);
+    await db.upsert({
       ...videoInfo,
       ...stats,
       transcript: text,
-      format: fmt as "text" | "time",
+      // Keep a timed copy for translation; never wipe an existing one.
+      timedTranscript: fmt === "text" ? timed || current?.timedTranscript : undefined,
+      format: fmt,
       favorite,
       tags: selectedTags,
       date: new Date().toISOString(),
-      copyCount: (existing?.copyCount || 0) + 1,
-    };
-
-    await db.add(record);
+      copyCount: (current?.copyCount || 0) + 1,
+    });
     GM_setClipboard(text);
-    close();
-    showToast(
-      `Kopyalandı! (${stats.words} kelime, ~${stats.tokens} token)`,
-    );
-    updateNavbarBadge();
+    m.close();
+    showToast(`Kopyalandı · ${stats.words.toLocaleString("tr-TR")} kelime, ~${stats.tokens.toLocaleString("tr-TR")} token`);
+    void updateNavbarBadge();
+    void refreshVideoActions();
   };
 
-  bg.addEventListener("click", (e) => {
+  m.dialog.addEventListener("click", (e) => {
     const target = e.target as HTMLElement;
-    if (
-      target === bg ||
-      target.closest(".ytc-modal-close") ||
-      target.closest('[data-action="cancel"]')
-    )
-      close();
-    if (target.closest('[data-action="copy"]')) doCopy();
-    if (target.closest('[data-action="recopy"]')) doCopy();
-  });
-
-  document.addEventListener("keydown", function handler(e) {
-    if (e.key === "Escape") {
-      close();
-      document.removeEventListener("keydown", handler);
+    const tag = target.closest<HTMLElement>("[data-tag]");
+    if (tag?.dataset.tag) {
+      selectedTags = selectedTags.filter((t) => t !== tag.dataset.tag);
+      renderTags();
+      tagInput.focus();
+      return;
     }
+    if (target.closest('[data-action="cancel"]')) m.close();
+    if (target.closest('[data-action="copy"]')) void doCopy();
   });
 };

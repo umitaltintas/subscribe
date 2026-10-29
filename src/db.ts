@@ -6,7 +6,6 @@ import type {
   SearchResult,
   SearchFilters,
   DBStats,
-  AISettings,
 } from "./types";
 
 type DB = IDBPDatabase<unknown>;
@@ -62,6 +61,7 @@ export class TranscriptDB {
     } as TranscriptRecord;
 
     await this.db!.put(CONFIG.STORE_NAME, data);
+    this.invalidateCache();
     return data;
   }
 
@@ -70,13 +70,51 @@ export class TranscriptDB {
     return this.db!.get(CONFIG.STORE_NAME, id);
   }
 
+  /**
+   * Merges `updates` into the stored record inside one readwrite transaction,
+   * so concurrent writers (a translation finishing while a summary is saved)
+   * cannot overwrite each other.
+   */
   async update(
     id: string,
-    updates: Partial<TranscriptRecord>,
+    updates: Partial<TranscriptRecord> | ((current: TranscriptRecord) => Partial<TranscriptRecord>),
   ): Promise<TranscriptRecord | null> {
-    const existing = await this.get(id);
-    if (!existing) return null;
-    return this.add({ ...existing, ...updates });
+    await this.ready;
+    const tx = this.db!.transaction(CONFIG.STORE_NAME, "readwrite");
+    const existing = (await tx.store.get(id)) as TranscriptRecord | undefined;
+    if (!existing) {
+      await tx.done;
+      return null;
+    }
+    const patch = typeof updates === "function" ? updates(existing) : updates;
+    const next = { ...existing, ...patch, id };
+    await tx.store.put(next);
+    await tx.done;
+    this.invalidateCache();
+    return next;
+  }
+
+  /**
+   * Inserts or merges a record in one transaction. Fields already stored
+   * (translations, summaries, favorite, tags…) are kept unless overridden.
+   */
+  async upsert(record: Partial<TranscriptRecord> & { id: string }): Promise<TranscriptRecord> {
+    await this.ready;
+    const tx = this.db!.transaction(CONFIG.STORE_NAME, "readwrite");
+    const existing = (await tx.store.get(record.id)) as TranscriptRecord | undefined;
+    const defined = Object.fromEntries(Object.entries(record).filter(([, v]) => v !== undefined));
+    const next = {
+      date: new Date().toISOString(),
+      favorite: false,
+      tags: [],
+      copyCount: 0,
+      ...existing,
+      ...defined,
+    } as TranscriptRecord;
+    await tx.store.put(next);
+    await tx.done;
+    this.invalidateCache();
+    return next;
   }
 
   async delete(id: string): Promise<boolean> {
@@ -93,7 +131,7 @@ export class TranscriptDB {
     }
 
     await this.ready;
-    const limit = options.limit || 500;
+    const limit = options.limit || 10_000;
     const results: TranscriptRecord[] = [];
 
     let cursor = await this.db!
@@ -218,14 +256,12 @@ export class TranscriptDB {
     this.invalidateCache();
   }
 
-  getAISettings(): AISettings | null {
-    const raw = localStorage.getItem("ytc-ai-settings");
-    if (!raw) return null;
-    return JSON.parse(raw) as AISettings;
-  }
-
-  saveAISettings(settings: AISettings): void {
-    localStorage.setItem("ytc-ai-settings", JSON.stringify(settings));
+  async deleteTranslation(id: string, langCode: string): Promise<void> {
+    await this.update(id, (current) => {
+      const translations = { ...(current.translations ?? {}) };
+      delete translations[langCode];
+      return { translations };
+    });
   }
 
   async clear(): Promise<boolean> {
@@ -236,22 +272,37 @@ export class TranscriptDB {
   }
 
   async export(): Promise<string> {
-    const all = await this.getAll();
+    await this.ready;
+    // Read the store directly: getAll() is capped and cached.
+    const all = await this.db!.getAll(CONFIG.STORE_NAME);
     return JSON.stringify(all, null, 2);
   }
 
   async import(jsonData: string): Promise<number> {
-    const data = JSON.parse(jsonData) as TranscriptRecord[];
+    let data: unknown;
+    try {
+      data = JSON.parse(jsonData);
+    } catch {
+      throw new Error("Dosya geçerli bir JSON değil");
+    }
+    if (!Array.isArray(data)) throw new Error("Beklenen format: kayıt dizisi");
+    const valid = data.filter(
+      (x): x is TranscriptRecord =>
+        !!x && typeof x === "object" && typeof x.id === "string" && typeof x.transcript === "string",
+    );
+    if (!valid.length) throw new Error("Dosyada geçerli kayıt bulunamadı");
+    data = valid;
     await this.ready;
     this.invalidateCache();
 
     const tx = this.db!.transaction(CONFIG.STORE_NAME, "readwrite");
-    for (const item of data) {
-      await tx.store.put(item);
+    const defaults: Partial<TranscriptRecord> = { tags: [], favorite: false, copyCount: 1, date: new Date().toISOString() };
+    for (const item of valid) {
+      await tx.store.put({ ...defaults, ...item });
     }
     await tx.done;
 
-    return data.length;
+    return valid.length;
   }
 }
 

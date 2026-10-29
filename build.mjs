@@ -1,15 +1,23 @@
 import { build, context } from "esbuild";
+import { readFileSync } from "node:fs";
+
+const { version } = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8"));
 
 const USERSCRIPT_HEADER = `// ==UserScript==
 // @name         SubScribe - YouTube Transcript Manager
 // @namespace    http://tampermonkey.net/
-// @version      1.4.1
+// @version      ${version}
 // @description  YouTube transcript manager with fuzzy search, AI translation, AI summarization, and subtitle overlay
 // @author       umitaltintas
 // @homepage     https://github.com/umitaltintas/subscribe
 // @match        https://www.youtube.com/*
 // @icon         data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' stop-color='%23FF3B30'/%3E%3Cstop offset='50%25' stop-color='%23FF2D55'/%3E%3Cstop offset='100%25' stop-color='%23AF52DE'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='512' height='512' rx='112' fill='%2309090B'/%3E%3Crect x='160' y='128' width='56' height='256' rx='28' fill='url(%23g)'/%3E%3Crect x='240' y='176' width='56' height='160' rx='28' fill='url(%23g)'/%3E%3Crect x='320' y='224' width='56' height='64' rx='28' fill='url(%23g)'/%3E%3C/svg%3E
 // @grant        GM_setClipboard
+// @grant        GM_getValue
+// @grant        GM_setValue
+// @grant        GM_xmlhttpRequest
+// @grant        unsafeWindow
+// @connect      openrouter.ai
 // @run-at       document-idle
 // ==/UserScript==`;
 
@@ -20,6 +28,7 @@ const buildOptions = {
   format: "iife",
   target: "es2020",
   banner: { js: USERSCRIPT_HEADER },
+  define: { __VERSION__: JSON.stringify(version) },
   charset: "utf8",
   logLevel: "info",
 };

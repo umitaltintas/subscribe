@@ -1,363 +1,409 @@
-import { CONFIG } from "./config";
-import type { AISettings, SubtitleCue, SummaryOptions } from "./types";
+import { CONFIG, getLanguage } from "./config";
+import { chat, emptyUsage, addUsage, ApiError, type ChatMessage } from "./openrouter";
+import { isAbortError, AbortError } from "./http";
+import {
+  parseSegments,
+  chunkSegments,
+  parseJsonLoose,
+  validateGroups,
+  groupsToText,
+  hashString,
+  formatTimestamp,
+  type Segment,
+  type TranslatedGroup,
+} from "./segments";
+import type { AISettings, SummaryOptions, Usage } from "./types";
 
-export const parseTimestampedTranscript = (text: string): SubtitleCue[] => {
-  const lines = text.split("\n").filter((l) => l.trim());
-  const cues: SubtitleCue[] = [];
+export type TranslateStage = "analyzing" | "translating";
 
-  for (const line of lines) {
-    const match = line.match(/^\[(?:(\d+):)?(\d+):(\d+)\]\s*(.+)$/);
-    if (!match) continue;
-
-    const hours = match[1] ? parseInt(match[1], 10) : 0;
-    const minutes = parseInt(match[2], 10);
-    const seconds = parseInt(match[3], 10);
-    const startTime = hours * 3600 + minutes * 60 + seconds;
-    const text = match[4].trim();
-
-    cues.push({ startTime, endTime: 0, text });
-  }
-
-  for (let i = 0; i < cues.length; i++) {
-    cues[i].endTime =
-      i < cues.length - 1 ? cues[i + 1].startTime : cues[i].startTime + 5;
-  }
-
-  return cues;
-};
-
-export const chunkTranscript = (
-  text: string,
-  chunkSize: number = CONFIG.AI.CHUNK_SIZE,
-): string[] => {
-  const lines = text.split("\n");
-  const chunks: string[] = [];
-  let current = "";
-
-  for (const line of lines) {
-    if (current.length + line.length + 1 > chunkSize && current.length > 0) {
-      chunks.push(current.trim());
-      current = "";
-    }
-    current += (current ? "\n" : "") + line;
-  }
-
-  if (current.trim()) {
-    chunks.push(current.trim());
-  }
-
-  return chunks;
-};
-
-export interface TranslationUsage {
-  promptTokens: number;
-  completionTokens: number;
-  totalCost: number;
+export interface TranslateProgress {
+  stage: TranslateStage;
+  done: number;
+  total: number;
 }
 
-let lastTranslationUsage: TranslationUsage = { promptTokens: 0, completionTokens: 0, totalCost: 0 };
+export interface TranslateResult {
+  translated: string;
+  /** Short context summary in the target language ("" if skipped). */
+  summary: string;
+  usage: Usage;
+}
 
-export const getLastTranslationUsage = (): TranslationUsage => lastTranslationUsage;
+interface VideoContext {
+  summary: string;
+  glossary: { term: string; translation: string }[];
+}
 
-const fetchGenerationCost = async (generationId: string, apiKey: string): Promise<number> => {
+// ---------------------------------------------------------------------------
+// Prompts
+// ---------------------------------------------------------------------------
+
+const translationSystemPrompt = (lang: string): string => `You are a professional subtitle translator. Translate YouTube video captions into ${lang}.
+
+INPUT: caption fragments as JSON: {"segments":[{"id":0,"text":"..."}]}. Auto-generated captions split sentences at arbitrary points, so one sentence usually spans several fragments.
+
+OUTPUT: JSON only: {"groups":[{"from":<first id>,"to":<last id>,"text":"<${lang} translation>"}]}
+
+GROUPING RULES (critical — the subtitles are timed from these ids):
+1. Groups cover every input id exactly once, in order, with no gaps or overlaps: the first "from" is the first input id, every next "from" is the previous "to" + 1, and the last "to" is the last input id.
+2. Each group is one complete, natural sentence. Never end a group in the middle of a sentence just because a fragment ends there.
+3. Keep groups subtitle-sized: ideally under 90 characters, never over 150 characters or about 12 seconds of speech. Split long sentences at natural clause boundaries.
+4. A group's text must translate exactly what is said in its fragments — do not add content, invent sentences, or move content to another group.
+
+TRANSLATION RULES:
+- Translate meaning, tone and intent naturally — not word by word. Use phrasing a native ${lang} speaker would use.
+- Preserve the speaker's register (formal, casual, humorous, technical).
+- Keep names, brands and technical terms as-is unless a widely accepted ${lang} form exists. Follow the glossary when given.
+- Drop filler words (um, uh, you know) and stuttered repetitions. Translate sound tags like [Music] into ${lang} in brackets.
+
+EXAMPLE (target: Turkish)
+Input: {"segments":[{"id":7,"text":"so today we're going to"},{"id":8,"text":"talk about something really important"},{"id":9,"text":"which is artificial intelligence"},{"id":10,"text":"and um how it's changing"},{"id":11,"text":"the way we work"}]}
+Output: {"groups":[{"from":7,"to":9,"text":"Bugün çok önemli bir konudan, yapay zekâdan bahsedeceğiz."},{"from":10,"to":11,"text":"Ve çalışma şeklimizi nasıl değiştirdiğinden."}]}`;
+
+const GROUPS_SCHEMA = {
+  name: "subtitle_groups",
+  schema: {
+    type: "object",
+    properties: {
+      groups: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            from: { type: "integer" },
+            to: { type: "integer" },
+            text: { type: "string" },
+          },
+          required: ["from", "to", "text"],
+          additionalProperties: false,
+        },
+      },
+    },
+    required: ["groups"],
+    additionalProperties: false,
+  },
+};
+
+const CONTEXT_SCHEMA = {
+  name: "video_context",
+  schema: {
+    type: "object",
+    properties: {
+      summary: { type: "string" },
+      glossary: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: { term: { type: "string" }, translation: { type: "string" } },
+          required: ["term", "translation"],
+          additionalProperties: false,
+        },
+      },
+    },
+    required: ["summary", "glossary"],
+    additionalProperties: false,
+  },
+};
+
+const tail = (segs: Segment[], n: number): string =>
+  segs.slice(-n).map((s) => s.text).join(" ");
+
+const buildChunkMessage = (
+  chunk: Segment[],
+  prev: Segment[] | undefined,
+  next: Segment[] | undefined,
+  ctx: VideoContext | null,
+): string => {
+  const parts: string[] = [];
+  if (ctx?.summary) parts.push(`VIDEO CONTEXT:\n${ctx.summary}`);
+  if (ctx?.glossary.length) {
+    parts.push(`GLOSSARY:\n${ctx.glossary.map((g) => `${g.term} → ${g.translation}`).join("\n")}`);
+  }
+  if (prev?.length) parts.push(`PRECEDING CAPTIONS (context only, do not translate):\n${tail(prev, 4)}`);
+  if (next?.length) {
+    parts.push(`FOLLOWING CAPTIONS (context only, do not translate):\n${next.slice(0, 3).map((s) => s.text).join(" ")}`);
+  }
+  parts.push(
+    `SEGMENTS (ids ${chunk[0].id}–${chunk[chunk.length - 1].id}):\n` +
+      JSON.stringify({ segments: chunk.map((s) => ({ id: s.id, text: s.text })) }),
+  );
+  return parts.join("\n\n");
+};
+
+// ---------------------------------------------------------------------------
+// Translation
+// ---------------------------------------------------------------------------
+
+const buildContext = async (
+  segments: Segment[],
+  lang: string,
+  settings: AISettings,
+  signal?: AbortSignal,
+): Promise<{ ctx: VideoContext | null; usage: Usage }> => {
+  const text = segments.map((s) => s.text).join(" ").slice(0, CONFIG.AI.CONTEXT_MAX_CHARS);
   try {
-    const res = await fetch(`https://openrouter.ai/api/v1/generation?id=${generationId}`, {
-      headers: { Authorization: `Bearer ${apiKey}` },
-    });
-    if (!res.ok) return 0;
-    const data = await res.json();
-    return data.data?.total_cost ?? 0;
-  } catch {
-    return 0;
+    const res = await chat(
+      [
+        {
+          role: "system",
+          content: `You prepare context for translating a video transcript into ${lang}.
+Return JSON: {"summary": "...", "glossary": [{"term": "...", "translation": "..."}]}
+- summary: 3-5 sentences in ${lang} — topic, speaker's tone/register, target audience.
+- glossary: up to 15 recurring names, terms or jargon with the ${lang} rendering to use consistently (keep the original when it should not be translated).`,
+        },
+        { role: "user", content: text },
+      ],
+      settings,
+      { signal, jsonSchema: CONTEXT_SCHEMA, temperature: 0.2 },
+    );
+    let ctx: VideoContext;
+    try {
+      const parsed = parseJsonLoose(res.content) as Partial<VideoContext>;
+      ctx = {
+        summary: String(parsed.summary ?? "").trim(),
+        glossary: Array.isArray(parsed.glossary) ? parsed.glossary.slice(0, 15) : [],
+      };
+    } catch {
+      ctx = { summary: res.content.trim(), glossary: [] };
+    }
+    return { ctx, usage: res.usage };
+  } catch (err) {
+    if (isAbortError(err)) throw err;
+    // Context only improves consistency; translation still works without it.
+    console.warn("[SubScribe] context step failed, continuing without it:", err);
+    return { ctx: null, usage: emptyUsage() };
   }
 };
 
-const summarizeTranscript = async (
-  transcript: string,
+const translateChunk = async (
+  chunk: Segment[],
+  prev: Segment[] | undefined,
+  next: Segment[] | undefined,
+  ctx: VideoContext | null,
+  lang: string,
   settings: AISettings,
-): Promise<string> => {
-  const response = await fetch(CONFIG.AI.OPENROUTER_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${settings.apiKey}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": window.location.href,
-    },
-    body: JSON.stringify({
-      model: settings.model,
-      messages: [
-        {
-          role: "system",
-          content: `Analyze this video transcript and provide a brief context summary (3-5 sentences). Include:
-- The main topic/theme
-- The speaker's tone and style (formal, casual, technical, humorous, etc.)
-- Key terminology or jargon used
-- The target audience
+  signal: AbortSignal | undefined,
+  addCost: (u: Usage) => void,
+): Promise<TranslatedGroup[]> => {
+  const messages: ChatMessage[] = [
+    { role: "system", content: translationSystemPrompt(lang) },
+    { role: "user", content: buildChunkMessage(chunk, prev, next, ctx) },
+  ];
+  let lastError = "";
 
-Output ONLY the summary. No headers, labels, or extra formatting.`,
-        },
-        {
-          role: "user",
-          content: transcript,
-        },
-      ],
-    }),
-  });
+  for (let attempt = 1; attempt <= CONFIG.AI.MAX_ATTEMPTS; attempt++) {
+    let res;
+    try {
+      res = await chat(messages, settings, { signal, jsonSchema: GROUPS_SCHEMA, temperature: 0.3 });
+    } catch (err) {
+      if (err instanceof ApiError && err.retryable && attempt < CONFIG.AI.MAX_ATTEMPTS) {
+        lastError = err.message;
+        continue;
+      }
+      throw err;
+    }
+    addCost(res.usage);
 
-  if (!response.ok) return "";
-  const data = await response.json();
+    let parsed: unknown;
+    try {
+      parsed = parseJsonLoose(res.content);
+    } catch (err) {
+      lastError = (err as Error).message;
+      messages.push(
+        { role: "assistant", content: res.content.slice(0, 4000) },
+        { role: "user", content: "That was not valid JSON. Reply with only the JSON object." },
+      );
+      continue;
+    }
 
-  const usage = data.usage;
-  if (usage) {
-    lastTranslationUsage.promptTokens += usage.prompt_tokens ?? 0;
-    lastTranslationUsage.completionTokens += usage.completion_tokens ?? 0;
-  }
-  if (data.id) {
-    const cost = await fetchGenerationCost(data.id, settings.apiKey);
-    lastTranslationUsage.totalCost += cost;
-  }
+    // Length limits get one correction round; after that coverage is what matters.
+    const check = validateGroups(parsed, chunk, { enforceLimits: attempt === 1 });
+    if (check.ok) return check.groups;
 
-  return data.choices?.[0]?.message?.content ?? "";
-};
-
-export const translateChunk = async (
-  chunk: string,
-  targetLang: string,
-  settings: AISettings,
-  context: string = "",
-): Promise<string> => {
-  const contextBlock = context
-    ? `\nVIDEO CONTEXT (use this to maintain consistency and accuracy):\n${context}\n`
-    : "";
-
-  const response = await fetch(CONFIG.AI.OPENROUTER_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${settings.apiKey}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": window.location.href,
-    },
-    body: JSON.stringify({
-      model: settings.model,
-      messages: [
-        {
-          role: "system",
-          content: `You are an expert localization specialist. Localize the following video transcript into ${targetLang}.
-${contextBlock}
-FORMAT RULES:
-- Each input line is: [MM:SS] text
-- Keep every timestamp in the same order. Do NOT add or remove timestamps.
-- Each output line MUST start with the original timestamp.
-
-NATURAL SENTENCE RULE:
-- The source transcript often splits a single sentence across multiple timestamps. Do NOT reproduce these awkward splits.
-- Write complete, natural sentences in ${targetLang}. Redistribute the meaning freely across the timestamp lines.
-- It is OK for a translated line to cover more or less meaning than the corresponding source line, as long as every timestamp has meaningful text and the overall meaning is fully preserved.
-
-Example input:
-[0:00] So today we're going to
-[0:03] talk about something really important
-[0:06] which is artificial intelligence
-
-Example output for Turkish:
-[0:00] Bugün çok önemli bir konudan bahsedeceğiz.
-[0:03] Yapay zeka!
-[0:06] Hadi başlayalım.
-
-Localization rules:
-- Adapt meaning, tone and intent naturally — do NOT translate word-by-word.
-- Use culturally appropriate expressions and phrasing native to ${targetLang}.
-- Preserve the speaker's style and register (formal, casual, humorous, technical).
-- Keep technical terms, brand names, and proper nouns unchanged unless they have a widely accepted localized form.
-- Output ONLY the localized lines. No commentary, notes, or extra text.`,
-        },
-        {
-          role: "user",
-          content: chunk,
-        },
-      ],
-    }),
-  });
-
-  if (!response.ok) {
-    const errorBody = await response.text().catch(() => "Unknown error");
-    throw new Error(
-      `OpenRouter API error (${response.status}): ${errorBody}`,
+    lastError = check.error;
+    messages.push(
+      { role: "assistant", content: res.content.slice(0, 4000) },
+      {
+        role: "user",
+        content: `Invalid output: ${check.error}. Groups must cover ids ${chunk[0].id}–${chunk[chunk.length - 1].id} contiguously, in order, each id exactly once. Return the corrected JSON only.`,
+      },
     );
   }
-
-  const data = await response.json();
-
-  if (!data.choices?.[0]?.message?.content) {
-    throw new Error("OpenRouter API returned an empty or invalid response");
-  }
-
-  // Track token usage
-  const usage = data.usage;
-  if (usage) {
-    lastTranslationUsage.promptTokens += usage.prompt_tokens ?? 0;
-    lastTranslationUsage.completionTokens += usage.completion_tokens ?? 0;
-  }
-
-  // Fetch actual cost from generation endpoint
-  if (data.id) {
-    const cost = await fetchGenerationCost(data.id, settings.apiKey);
-    lastTranslationUsage.totalCost += cost;
-  }
-
-  return data.choices[0].message.content;
+  throw new Error(`Model çıktısı kaynakla eşleşmedi, ${CONFIG.AI.MAX_ATTEMPTS} deneme yapıldı (${lastError})`);
 };
 
-const cleanTranscript = (text: string): string => {
-  const seen = new Set<string>();
-  return text
-    .split("\n")
-    .filter((line) => {
-      const trimmed = line.trim();
-      // Remove empty lines, bare brackets, timestamp-only lines
-      if (!trimmed || trimmed === "[]" || /^\[\d{1,2}:\d{2}(:\d{2})?\]\s*$/.test(trimmed)) return false;
-      // Deduplicate identical lines
-      if (seen.has(trimmed)) return false;
-      seen.add(trimmed);
-      return true;
-    })
-    .join("\n");
-};
+interface PartialJob {
+  ctx: VideoContext | null;
+  results: (TranslatedGroup[] | undefined)[];
+}
 
-const buildSummaryPrompt = (options?: SummaryOptions): string => {
-  const format = options?.format ?? "structured";
-  const tone = options?.tone ?? "neutral";
-  const length = options?.length ?? "medium";
-
-  const formatInstructions: Record<string, string> = {
-    structured: `Your summary should include:
-1. **Ana Konu**: A one-line description of what the video is about
-2. **Önemli Noktalar**: Key points and takeaways (bullet points)
-3. **Sonuç**: Brief conclusion or final thoughts
-
-Use markdown-style formatting with headers and bullet points.`,
-    bullets: `Present the summary as a clean bullet-point list.
-- Start with a one-line topic sentence
-- Then list all key points as bullet items
-- No headers, no paragraphs — only bullet points`,
-    paragraph: `Write the summary as flowing, well-structured paragraphs.
-- No bullet points or numbered lists
-- Use natural paragraph breaks between ideas
-- Write in a narrative style`,
-    tldr: `Write an ultra-short TL;DR summary in 2-3 sentences maximum.
-- Capture only the single most important takeaway
-- Be extremely concise`,
-  };
-
-  const toneInstructions: Record<string, string> = {
-    neutral: "",
-    simple: "Use simple, easy-to-understand language. Avoid jargon and technical terms. Explain as if to someone unfamiliar with the topic.",
-    technical: "Use precise technical language and domain-specific terminology. Be exact and detailed in descriptions.",
-    academic: "Use formal academic language. Structure the analysis rigorously with clear logical flow.",
-    casual: "Use a friendly, conversational tone. Keep it relaxed and approachable, like explaining to a friend.",
-  };
-
-  const lengthInstructions: Record<string, string> = {
-    short: "Keep the summary brief — aim for roughly 3-5 bullet points or 1-2 short paragraphs.",
-    medium: "Provide a balanced summary — aim for roughly 5-8 bullet points or 2-3 paragraphs.",
-    long: "Provide a comprehensive, detailed summary — cover all significant points, examples, and nuances discussed in the video.",
-  };
-
-  let prompt = `You are a skilled content analyst. Summarize the following video transcript in the same language as the transcript.\n\n`;
-  prompt += formatInstructions[format] + "\n\n";
-  prompt += lengthInstructions[length] + "\n";
-  if (toneInstructions[tone]) {
-    prompt += "\nTone: " + toneInstructions[tone] + "\n";
-  }
-  prompt += "\nOutput ONLY the summary. No meta-commentary.";
-
-  return prompt;
-};
-
-export const summarizeForUser = async (
-  transcript: string,
-  settings: AISettings,
-  onProgress?: (stage: string) => void,
-  options?: SummaryOptions,
-): Promise<string> => {
-  onProgress?.("analyzing");
-  const cleaned = cleanTranscript(transcript);
-
-  const response = await fetch(CONFIG.AI.OPENROUTER_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${settings.apiKey}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": window.location.href,
-    },
-    body: JSON.stringify({
-      model: settings.model,
-      messages: [
-        {
-          role: "system",
-          content: buildSummaryPrompt(options),
-        },
-        {
-          role: "user",
-          content: cleaned,
-        },
-      ],
-    }),
-  });
-
-  if (!response.ok) {
-    const errorBody = await response.text().catch(() => "Unknown error");
-    throw new Error(`API error (${response.status}): ${errorBody}`);
-  }
-
-  const data = await response.json();
-
-  if (!data.choices?.[0]?.message?.content) {
-    throw new Error("API returned an empty response");
-  }
-
-  return data.choices[0].message.content;
-};
+// Finished chunks survive a failure or cancel, so "try again" only pays for
+// the chunks that are still missing.
+const partialJobs = new Map<string, PartialJob>();
 
 export const translateTranscript = async (
   transcript: string,
   targetLang: string,
   settings: AISettings,
-  onProgress?: (percent: number, stage?: string) => void,
-): Promise<{ translated: string; summary: string }> => {
-  lastTranslationUsage = { promptTokens: 0, completionTokens: 0, totalCost: 0 };
-  const cleaned = cleanTranscript(transcript);
-
-  // First pass: summarize the full transcript for context
-  onProgress?.(0, "analyzing");
-  const summary = await summarizeTranscript(cleaned, settings);
-
-  const chunks = chunkTranscript(cleaned);
-  const total = chunks.length;
-  let completed = 0;
-
-  onProgress?.(0, "translating");
-
-  // Process chunks in parallel batches of up to 5
-  const CONCURRENCY = 5;
-  const results: string[] = new Array(total);
-
-  for (let start = 0; start < total; start += CONCURRENCY) {
-    const batch = chunks.slice(start, start + CONCURRENCY);
-    const promises = batch.map((chunk, i) =>
-      translateChunk(chunk, targetLang, settings, summary).then((translated) => {
-        results[start + i] = translated;
-        completed++;
-        onProgress?.(Math.round((completed / total) * 100), "translating");
-      }),
-    );
-
-    const settled = await Promise.allSettled(promises);
-    const failed = settled.find((r) => r.status === "rejected");
-    if (failed && failed.status === "rejected") {
-      throw new Error(`Translation failed: ${failed.reason instanceof Error ? failed.reason.message : String(failed.reason)}`);
-    }
+  opts: {
+    signal?: AbortSignal;
+    onProgress?: (p: TranslateProgress) => void;
+    /** Pre-parsed segments (e.g. millisecond caption data); defaults to parsing `transcript`. */
+    segments?: Segment[];
+  } = {},
+): Promise<TranslateResult> => {
+  const { signal, onProgress } = opts;
+  const lang = getLanguage(targetLang).english;
+  const segments = opts.segments?.length ? opts.segments : parseSegments(transcript);
+  if (!segments.length) {
+    throw new Error("Transkriptte zaman damgası yok. Zaman damgalı formatta kaydedip tekrar deneyin.");
   }
 
-  return { translated: results.join("\n"), summary };
+  const chunks = chunkSegments(segments, CONFIG.AI.CHUNK_SIZE);
+  const jobKey = `${hashString(segments.map((x) => `${x.start} ${x.text}`).join("\n"))}:${targetLang}:${settings.model}`;
+  const job: PartialJob = partialJobs.get(jobKey) ?? { ctx: null, results: new Array(chunks.length) };
+  partialJobs.set(jobKey, job);
+
+  let usage = emptyUsage();
+  const addCost = (u: Usage) => {
+    usage = addUsage(usage, u);
+  };
+
+  if (chunks.length > 1 && !job.ctx) {
+    onProgress?.({ stage: "analyzing", done: 0, total: chunks.length });
+    const { ctx, usage: u } = await buildContext(segments, lang, settings, signal);
+    job.ctx = ctx;
+    addCost(u);
+  }
+
+  let done = job.results.filter(Boolean).length;
+  onProgress?.({ stage: "translating", done, total: chunks.length });
+
+  // Worker pool: keeps CONCURRENCY requests in flight instead of waiting for
+  // the slowest request of each batch.
+  const pending = chunks.map((_, i) => i).filter((i) => !job.results[i]);
+  const errors: unknown[] = [];
+  const failFast = new AbortController();
+  const onAbort = () => failFast.abort();
+  signal?.addEventListener("abort", onAbort, { once: true });
+
+  const worker = async () => {
+    while (pending.length && !failFast.signal.aborted) {
+      const i = pending.shift()!;
+      try {
+        job.results[i] = await translateChunk(
+          chunks[i],
+          chunks[i - 1],
+          chunks[i + 1],
+          job.ctx,
+          lang,
+          settings,
+          failFast.signal,
+          addCost,
+        );
+        done++;
+        onProgress?.({ stage: "translating", done, total: chunks.length });
+      } catch (err) {
+        errors.push(err);
+        failFast.abort();
+      }
+    }
+  };
+
+  try {
+    await Promise.all(Array.from({ length: Math.min(CONFIG.AI.CONCURRENCY, pending.length) }, worker));
+  } finally {
+    signal?.removeEventListener("abort", onAbort);
+  }
+
+  if (signal?.aborted) throw new AbortError();
+  const realError = errors.find((e) => !isAbortError(e));
+  if (realError) {
+    const saved = job.results.filter(Boolean).length;
+    const msg = realError instanceof Error ? realError.message : String(realError);
+    throw new Error(saved ? `${msg} — ${saved}/${chunks.length} parça kaydedildi, tekrar denerseniz kaldığı yerden devam eder.` : msg);
+  }
+
+  partialJobs.delete(jobKey);
+  const groups = job.results.flatMap((r) => r ?? []);
+  return { translated: groupsToText(groups, segments), summary: job.ctx?.summary ?? "", usage };
+};
+
+
+// ---------------------------------------------------------------------------
+// Summary
+// ---------------------------------------------------------------------------
+
+const buildSummaryPrompt = (options: SummaryOptions): string => {
+  const langLine =
+    !options.language || options.language === "auto"
+      ? "Write the summary in the same language as the transcript."
+      : `Write the summary in ${getLanguage(options.language).english}, regardless of the transcript's language.`;
+
+  const timestampHint =
+    "When a point refers to a specific moment, append the transcript timestamp in the form [m:ss] (e.g. [12:34]).";
+
+  const formatInstructions: Record<SummaryOptions["format"], string> = {
+    structured: `Structure:
+1. A heading for the main topic, followed by one sentence describing what the video is about.
+2. A heading for key points, followed by bullet points with the takeaways. ${timestampHint}
+3. A heading for the conclusion, followed by a short wrap-up.
+Write the headings in the output language. Use markdown (### headings, - bullets, **bold** for key terms).`,
+    bullets: `Present the summary as a clean markdown bullet list.
+- Start with a one-line topic sentence.
+- Then list the key points as bullet items. ${timestampHint}
+- No headings, no paragraphs.`,
+    paragraph: `Write flowing, well-structured paragraphs.
+- No bullet points or numbered lists.
+- Natural paragraph breaks between ideas, narrative style.`,
+    tldr: `Write an ultra-short TL;DR of 2-3 sentences that captures only the most important takeaway.`,
+  };
+
+  const toneInstructions: Record<SummaryOptions["tone"], string> = {
+    neutral: "",
+    simple: "Use simple, easy-to-understand language. Avoid jargon; explain as if to someone new to the topic.",
+    technical: "Use precise technical language and domain terminology. Be exact and detailed.",
+    academic: "Use formal academic language with rigorous structure and clear logical flow.",
+    casual: "Use a friendly, conversational tone, like explaining to a friend.",
+  };
+
+  const lengthInstructions: Record<SummaryOptions["length"], string> = {
+    short: "Keep it brief — roughly 3-5 bullet points or 1-2 short paragraphs.",
+    medium: "Balanced — roughly 5-8 bullet points or 2-3 paragraphs.",
+    long: "Comprehensive — cover all significant points, examples and nuances.",
+  };
+
+  return [
+    "You are a skilled content analyst. Summarize the following YouTube video transcript.",
+    langLine,
+    formatInstructions[options.format],
+    options.format === "tldr" ? "" : lengthInstructions[options.length],
+    toneInstructions[options.tone] ? `Tone: ${toneInstructions[options.tone]}` : "",
+    "Base the summary only on the transcript. Output ONLY the summary — no preamble or meta-commentary.",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+};
+
+export const summarizeForUser = async (
+  transcript: string,
+  settings: AISettings,
+  options: SummaryOptions,
+  opts: { signal?: AbortSignal } = {},
+): Promise<{ summary: string; usage: Usage }> => {
+  // Collapse duplicate caption lines; keep timestamps so the model can cite moments.
+  const segments = parseSegments(transcript);
+  const body = segments.length
+    ? segments.map((s) => `[${formatTimestamp(s.start)}] ${s.text}`).join("\n")
+    : transcript;
+
+  const res = await chat(
+    [
+      { role: "system", content: buildSummaryPrompt(options) },
+      { role: "user", content: body },
+    ],
+    settings,
+    { signal: opts.signal, temperature: 0.4 },
+  );
+  return { summary: res.content.trim(), usage: res.usage };
 };

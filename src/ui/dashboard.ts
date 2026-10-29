@@ -1,270 +1,174 @@
-import { $, setHTML, injectStyles, showToast } from "../dom";
-import { esc, truncate, formatDate, debounce } from "../utils";
+import { setHTML, showToast } from "../dom";
+import { esc, truncate, formatDate, debounce, highlight, downloadText } from "../utils";
 import { icons } from "../icons";
-import { CONFIG } from "../config";
+import { CONFIG, getLanguage } from "../config";
 import { db } from "../db";
 import { searchManager } from "../search";
+import { getOverlayState } from "../subtitle-overlay";
+import { showSubtitles, hideSubtitles, cancelJobsFor, cancelAllJobs } from "../translation-service";
 import { updateNavbarBadge } from "./navbar";
 import { showTranscriptViewer } from "./viewer";
-import { parseCuesFromTranslatedText, showSubtitleOverlay, hideSubtitleOverlay, isOverlayActive } from "../subtitle-overlay";
+import { openSettings } from "./settings";
+import { openModal, confirmDialog } from "./modal";
 import type { SearchResult, TranscriptRecord } from "../types";
 
-const showTranslationViewer = (item: TranscriptRecord, lang: string, translated: string): void => {
-  ($(".ytc-translation-viewer") as HTMLElement)?.remove();
+type DashTab = "history" | "favorites" | "translations" | "stats" | "settings";
 
-  const langName = CONFIG.AI.AVAILABLE_LANGUAGES.find((l) => l.code === lang)?.name || lang.toUpperCase();
+const loadingHtml = (msg = "Yükleniyor…") => `<div class="ytc-loading"><div class="ytc-spinner"></div>${msg}</div>`;
 
-  const modal = document.createElement("div");
-  modal.className = "ytc-modal-bg ytc-translation-viewer";
-  setHTML(
-    modal,
-    `
-    <div class="ytc-modal" style="width:min(700px,95vw)">
-      <div class="ytc-modal-header">
-        <h2>${icons.translate} ${esc(truncate(item.title, 35))} — ${esc(langName)}</h2>
-        <button class="ytc-modal-close">${icons.x}</button>
-      </div>
-      <div class="ytc-modal-body" style="padding:20px">
-        <div class="ytc-meta" style="margin-bottom:16px">
-          <span>${icons.tv} ${esc(item.channel)}</span>
-          <span>${icons.translate} ${esc(langName)}</span>
-        </div>
-        ${item.summary ? `<div style="background:rgba(255,255,255,.05);border-left:3px solid rgba(76,175,80,.5);padding:10px 14px;margin-bottom:14px;border-radius:6px;font-size:13px;line-height:1.5;color:rgba(255,255,255,.7)"><strong style="color:rgba(255,255,255,.9)">Video Özeti:</strong> ${esc(item.summary)}</div>` : ""}
-        <div class="ytc-preview">${esc(translated)}</div>
-      </div>
-      <div class="ytc-modal-footer">
-        <button class="ytc-btn secondary" data-action="copy-translation">${icons.clipboard} Kopyala</button>
-        <button class="ytc-btn secondary" data-action="play-subs">${icons.subtitles} Altyazı Göster</button>
-        <button class="ytc-btn" data-action="close-viewer">Kapat</button>
-      </div>
-    </div>
-  `,
-  );
+const emptyHtml = (title: string, hint = "") => `
+  <div class="ytc-empty">
+    <div class="ytc-empty-icon">${icons.inbox}</div>
+    <div class="ytc-empty-text">${esc(title)}</div>
+    ${hint ? `<div class="ytc-empty-hint">${esc(hint)}</div>` : ""}
+  </div>`;
 
-  document.body.appendChild(modal);
+const langTags = (item: TranscriptRecord) =>
+  Object.keys(item.translations ?? {})
+    .map(
+      (c) =>
+        `<button class="ytc-tag lang" data-open-translation="${esc(item.id)}" data-lang="${esc(c)}" title="${esc(getLanguage(c).name)} çeviriyi görüntüle">${icons.translate} ${esc(c.toUpperCase())}</button>`,
+    )
+    .join("");
 
-  modal.addEventListener("click", (e) => {
-    const target = e.target as HTMLElement;
-    if (target === modal || target.closest(".ytc-modal-close") || target.closest('[data-action="close-viewer"]')) {
-      modal.remove();
-    }
-    if (target.closest('[data-action="copy-translation"]')) {
-      GM_setClipboard(translated);
-      showToast("Çeviri kopyalandı!");
-    }
-    if (target.closest('[data-action="play-subs"]')) {
-      if (isOverlayActive()) {
-        hideSubtitleOverlay();
-        showToast("Altyazı kapatıldı");
-      } else {
-        const cues = parseCuesFromTranslatedText(translated);
-        if (cues.length > 0) {
-          showSubtitleOverlay(cues);
-          showToast("Altyazı açıldı — videoya gidin");
-        } else {
-          showToast("Altyazı ayrıştırılamadı", "error");
-        }
-      }
-    }
-  });
+export const showDashboard = async (initialTab: DashTab = "history"): Promise<void> => {
+  const [stats, allTags, allChannels] = await Promise.all([db.getStats(), db.getAllTags(), db.getAllChannels()]);
+  let tab: DashTab = initialTab;
+  let currentQuery = "";
 
-  document.addEventListener("keydown", function handler(e) {
-    if (e.key === "Escape") {
-      modal.remove();
-      document.removeEventListener("keydown", handler);
-    }
-  });
-};
+  const tabBtn = (id: DashTab, icon: string, label: string, count?: number) =>
+    `<button class="ytc-tab" role="tab" data-tab="${id}">${icon} ${label}${count ? ` <span class="ytc-count">${count}</span>` : ""}</button>`;
 
-export const showDashboard = async (
-  initialTab = "history",
-): Promise<void> => {
-  injectStyles();
-  ($(".ytc-modal-bg") as HTMLElement)?.remove();
-
-  const stats = await db.getStats();
-  const allTags = await db.getAllTags();
-  const allChannels = await db.getAllChannels();
-
-  const bg = document.createElement("div");
-  bg.className = "ytc-modal-bg";
-  setHTML(
-    bg,
-    `
-    <div class="ytc-modal">
-      <div class="ytc-modal-header">
-        <h2>${icons.library} Transkript Yöneticisi</h2>
-        <button class="ytc-modal-close">${icons.x}</button>
+  const m = openModal({
+    id: "ytc-dashboard-modal",
+    width: 920,
+    title: `${icons.library} SubScribe kütüphanesi`,
+    body: `
+      <div class="ytc-tabs sticky" role="tablist">
+        ${tabBtn("history", icons.clock, "Geçmiş", stats.total)}
+        ${tabBtn("favorites", icons.star, "Favoriler", stats.favorites)}
+        ${tabBtn("translations", icons.translate, "Çeviriler")}
+        ${tabBtn("stats", icons.barChart, "İstatistik")}
+        ${tabBtn("settings", icons.database, "Veri")}
       </div>
 
-      <div class="ytc-tabs">
-        <button class="ytc-tab ${initialTab === "history" ? "active" : ""}" data-tab="history">${icons.clock} Geçmiş</button>
-        <button class="ytc-tab ${initialTab === "favorites" ? "active" : ""}" data-tab="favorites">${icons.star} Favoriler</button>
-        <button class="ytc-tab ${initialTab === "translations" ? "active" : ""}" data-tab="translations">${icons.translate} Çeviriler</button>
-        <button class="ytc-tab ${initialTab === "stats" ? "active" : ""}" data-tab="stats">${icons.barChart} İstatistik</button>
-        <button class="ytc-tab ${initialTab === "settings" ? "active" : ""}" data-tab="settings">${icons.settings} Ayarlar</button>
-      </div>
-
-      <div class="ytc-tab-content ${initialTab === "history" ? "active" : ""}" id="tab-history">
+      <div class="ytc-tab-content" id="tab-history" role="tabpanel">
         <div class="ytc-toolbar">
-          <input type="text" class="ytc-search" placeholder="Fuzzy arama... (örn: python tutorial)" id="ytc-search">
-          <select class="ytc-filter" id="ytc-tag-filter">
+          <input type="search" class="ytc-search" placeholder="Başlık, kanal, etiket veya içerikte ara…" id="ytc-search" aria-label="Kütüphanede ara">
+          <select class="ytc-filter" id="ytc-tag-filter" aria-label="Etikete göre filtrele">
             <option value="">Tüm etiketler</option>
             ${allTags.map((t) => `<option value="${esc(t)}">${esc(t)}</option>`).join("")}
           </select>
-          <select class="ytc-filter" id="ytc-channel-filter">
+          <select class="ytc-filter" id="ytc-channel-filter" aria-label="Kanala göre filtrele">
             <option value="">Tüm kanallar</option>
-            ${allChannels.map((c) => `<option value="${esc(c)}">${truncate(c, 20)}</option>`).join("")}
+            ${allChannels.map((c) => `<option value="${esc(c)}">${esc(truncate(c, 24))}</option>`).join("")}
           </select>
-          <button class="ytc-btn small secondary" id="ytc-refresh" title="Yenile">${icons.refreshCw}</button>
         </div>
-        <div style="padding:0 20px;">
-          <div class="ytc-search-hint">${icons.lightbulb} Fuzzy arama: yazım hataları tolere edilir, benzer sonuçlar bulunur</div>
-        </div>
-        <div class="ytc-list" id="ytc-history-list">
-          <div class="ytc-loading"><div class="ytc-spinner"></div>Yükleniyor...</div>
-        </div>
+        <div class="ytc-search-hint" id="ytc-search-hint">${icons.lightbulb} Bulanık arama: yazım hataları tolere edilir</div>
+        <div class="ytc-list" id="ytc-history-list">${loadingHtml()}</div>
       </div>
 
-      <div class="ytc-tab-content ${initialTab === "favorites" ? "active" : ""}" id="tab-favorites">
+      <div class="ytc-tab-content" id="tab-favorites" role="tabpanel">
         <div class="ytc-toolbar">
-          <input type="text" class="ytc-search" placeholder="Favorilerde ara..." id="ytc-fav-search">
+          <input type="search" class="ytc-search" placeholder="Favorilerde ara…" id="ytc-fav-search" aria-label="Favorilerde ara">
         </div>
-        <div class="ytc-list" id="ytc-favorites-list">
-          <div class="ytc-loading"><div class="ytc-spinner"></div>Yükleniyor...</div>
-        </div>
+        <div class="ytc-list" id="ytc-favorites-list">${loadingHtml()}</div>
       </div>
 
-      <div class="ytc-tab-content ${initialTab === "translations" ? "active" : ""}" id="tab-translations">
-        <div class="ytc-list" id="ytc-translations-list">
-          <div class="ytc-loading"><div class="ytc-spinner"></div>Yükleniyor...</div>
-        </div>
+      <div class="ytc-tab-content" id="tab-translations" role="tabpanel">
+        <div class="ytc-list" id="ytc-translations-list">${loadingHtml()}</div>
       </div>
 
-      <div class="ytc-tab-content ${initialTab === "stats" ? "active" : ""}" id="tab-stats">
+      <div class="ytc-tab-content ytc-pad" id="tab-stats" role="tabpanel">
         <div class="ytc-stats-grid">
-          <div class="ytc-stat-card"><div class="ytc-stat-value">${stats.total}</div><div class="ytc-stat-label">Toplam Video</div></div>
+          <div class="ytc-stat-card"><div class="ytc-stat-value">${stats.total}</div><div class="ytc-stat-label">Video</div></div>
           <div class="ytc-stat-card"><div class="ytc-stat-value">${stats.favorites}</div><div class="ytc-stat-label">Favori</div></div>
-          <div class="ytc-stat-card"><div class="ytc-stat-value">${stats.thisWeek}</div><div class="ytc-stat-label">Bu Hafta</div></div>
-          <div class="ytc-stat-card"><div class="ytc-stat-value">${stats.channelCount}</div><div class="ytc-stat-label">Farklı Kanal</div></div>
-          <div class="ytc-stat-card"><div class="ytc-stat-value">~${(stats.totalTokens / 1000).toFixed(1)}K</div><div class="ytc-stat-label">Toplam Token</div></div>
-          <div class="ytc-stat-card"><div class="ytc-stat-value">${stats.indexTime ? stats.indexTime.toFixed(0) + "ms" : "-"}</div><div class="ytc-stat-label">Index Süresi</div></div>
+          <div class="ytc-stat-card"><div class="ytc-stat-value">${stats.thisWeek}</div><div class="ytc-stat-label">Bu hafta</div></div>
+          <div class="ytc-stat-card"><div class="ytc-stat-value">${stats.channelCount}</div><div class="ytc-stat-label">Kanal</div></div>
+          <div class="ytc-stat-card"><div class="ytc-stat-value">${(stats.totalWords / 1000).toFixed(1)}K</div><div class="ytc-stat-label">Kelime</div></div>
+          <div class="ytc-stat-card"><div class="ytc-stat-value">~${(stats.totalTokens / 1000).toFixed(1)}K</div><div class="ytc-stat-label">Token</div></div>
         </div>
-
         ${
-          stats.topCopied.length > 0
-            ? `
-          <div class="ytc-section">
-            <div class="ytc-section-title">${icons.flame} En Çok Kopyalanan</div>
-            ${stats.topCopied
-              .map(
-                (v) => `
-              <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--ytc-border)">
-                <img src="https://i.ytimg.com/vi/${esc(v.id)}/default.jpg" style="width:60px;border-radius:6px">
-                <div style="flex:1;min-width:0">
-                  <div style="font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(v.title)}</div>
-                  <div style="font-size:11px;color:var(--ytc-muted)">${v.copyCount}x kopyalandı</div>
-                </div>
-              </div>
-            `,
-              )
-              .join("")}
-          </div>
-        `
+          stats.topCopied.length
+            ? `<div class="ytc-section">
+                <div class="ytc-section-title">${icons.flame} En çok kopyalanan</div>
+                ${stats.topCopied
+                  .map(
+                    (v) => `<div class="ytc-row">
+                      <img src="https://i.ytimg.com/vi/${esc(v.id)}/default.jpg" alt="" loading="lazy">
+                      <div class="ytc-row-main">
+                        <div class="ytc-row-title">${esc(v.title)}</div>
+                        <div class="ytc-row-sub">${v.copyCount || 0} kez kopyalandı</div>
+                      </div>
+                    </div>`,
+                  )
+                  .join("")}
+              </div>`
             : ""
         }
-
         ${
-          stats.channels.length > 0
-            ? `
-          <div class="ytc-section">
-            <div class="ytc-section-title">${icons.tv} Kanallar</div>
-            <div style="display:flex;flex-wrap:wrap;gap:8px">
-              ${stats.channels.map((c) => `<span class="ytc-tag">${esc(c)}</span>`).join("")}
-            </div>
-          </div>
-        `
+          stats.channels.length
+            ? `<div class="ytc-section">
+                <div class="ytc-section-title">${icons.tv} Kanallar</div>
+                <div class="ytc-tags">${stats.channels.map((c) => `<span class="ytc-tag neutral">${esc(c)}</span>`).join("")}</div>
+              </div>`
             : ""
         }
       </div>
 
-      <div class="ytc-tab-content ${initialTab === "settings" ? "active" : ""}" id="tab-settings">
+      <div class="ytc-tab-content ytc-pad" id="tab-settings" role="tabpanel">
         <div class="ytc-section">
-          <div class="ytc-section-title">${icons.database} Veri Yönetimi</div>
+          <div class="ytc-section-title">${icons.settings} Yapay zekâ ve altyazı</div>
+          <button class="ytc-btn secondary" data-action="open-settings">${icons.settings} Ayarları aç</button>
+        </div>
+        <div class="ytc-section">
+          <div class="ytc-section-title">${icons.database} Yedekleme</div>
           <div style="display:flex;gap:10px;flex-wrap:wrap">
-            <button class="ytc-btn secondary" id="ytc-export">${icons.upload} JSON Dışa Aktar</button>
+            <button class="ytc-btn secondary" data-action="export">${icons.upload} JSON olarak dışa aktar</button>
             <label class="ytc-btn secondary" style="cursor:pointer">
-              ${icons.download} JSON İçe Aktar
-              <input type="file" accept=".json" id="ytc-import" style="display:none">
+              ${icons.download} JSON içe aktar
+              <input type="file" accept=".json,application/json" id="ytc-import" class="ytc-sr-only">
             </label>
-            <button class="ytc-btn secondary" id="ytc-rebuild-index">${icons.refreshCw} Index Yenile</button>
-            <button class="ytc-btn danger" id="ytc-clear-all">${icons.trash} Tümünü Sil</button>
+            <button class="ytc-btn secondary" data-action="rebuild-index">${icons.refreshCw} Arama dizinini yenile</button>
           </div>
+          <div class="ytc-help">Çeviriler ve özetler de yedeğe dahildir.</div>
         </div>
-
-        <div class="ytc-section" style="margin-top:24px">
-          <div class="ytc-section-title">${icons.search} Arama Hakkında</div>
-          <div style="font-size:13px;color:var(--ytc-muted);line-height:1.8">
-            <p><strong>Fuse.js Fuzzy Search</strong> kullanılıyor.</p>
-            <p>• Yazım hatalarını tolere eder</p>
-            <p>• Benzer kelimeleri bulur</p>
-            <p>• Başlık, kanal, etiket ve transcript içinde arar</p>
-            <p>• Performans için transcript'in ilk ${CONFIG.SEARCH_PREVIEW_LENGTH} karakteri indexlenir</p>
-          </div>
+        <div class="ytc-section">
+          <div class="ytc-section-title">${icons.trash} Tehlikeli bölge</div>
+          <button class="ytc-btn danger" data-action="clear-all">${icons.trash} Tüm kayıtları sil</button>
         </div>
-
-        <div class="ytc-section" style="margin-top:24px">
+        <div class="ytc-section" style="margin-bottom:0">
           <div class="ytc-section-title">${icons.info} Hakkında</div>
-          <div style="font-size:13px;color:var(--ytc-muted);line-height:1.6">
-            <p><strong>SubScribe v1.0.0</strong></p>
-            <p>Fuse.js ile güçlendirilmiş fuzzy search.</p>
+          <div class="ytc-prose">
+            <p><strong>SubScribe v${esc(CONFIG.VERSION)}</strong> · <a href="${CONFIG.HOMEPAGE}" target="_blank" rel="noopener" style="color:var(--ytc-primary-text)">GitHub</a></p>
+            <p>Arama başlık, kanal, etiket ve transkriptin ilk ${CONFIG.SEARCH_PREVIEW_LENGTH} karakterinde yapılır.</p>
           </div>
         </div>
-      </div>
+      </div>`,
+    onClose: () => void updateNavbarBadge(),
+  });
 
-      <div class="ytc-modal-footer">
-        <button class="ytc-btn" data-action="close">Kapat</button>
-      </div>
-    </div>
-  `,
-  );
-
-  document.body.appendChild(bg);
-
-  const tabs = bg.querySelectorAll(".ytc-tab");
-  const tabContents = bg.querySelectorAll(".ytc-tab-content");
-  const historyList = bg.querySelector("#ytc-history-list") as HTMLElement;
-  const favoritesList = bg.querySelector("#ytc-favorites-list") as HTMLElement;
-  const searchInput = bg.querySelector("#ytc-search") as HTMLInputElement;
-  const favSearchInput = bg.querySelector("#ytc-fav-search") as HTMLInputElement;
-  const tagFilter = bg.querySelector("#ytc-tag-filter") as HTMLSelectElement;
-  const channelFilter = bg.querySelector("#ytc-channel-filter") as HTMLSelectElement;
-
-  let currentQuery = "";
-  let searchStartTime = 0;
+  const q = <T extends HTMLElement>(sel: string) => m.dialog.querySelector(sel) as T;
+  const historyList = q<HTMLElement>("#ytc-history-list");
+  const favoritesList = q<HTMLElement>("#ytc-favorites-list");
+  const translationsList = q<HTMLElement>("#ytc-translations-list");
+  const searchInput = q<HTMLInputElement>("#ytc-search");
+  const favSearchInput = q<HTMLInputElement>("#ytc-fav-search");
+  const tagFilter = q<HTMLSelectElement>("#ytc-tag-filter");
+  const channelFilter = q<HTMLSelectElement>("#ytc-channel-filter");
 
   const renderItem = (item: SearchResult): string => {
-    const hasScore = typeof item._score === "number";
-    const scorePercent = hasScore ? Math.round((1 - item._score!) * 100) : null;
+    const scorePercent = typeof item._score === "number" ? Math.round((1 - item._score) * 100) : null;
 
     let matchPreview = "";
-    if (item._matches) {
-      const transcriptMatch = item._matches.find((m) => m.key === "searchableTranscript");
-      if (transcriptMatch && transcriptMatch.indices.length > 0) {
-        const text = item.transcript || "";
-        const [start] = transcriptMatch.indices[0];
-        const previewStart = Math.max(0, start - 30);
-        const previewEnd = Math.min(text.length, start + 100);
-        let preview = text.slice(previewStart, previewEnd);
-        if (previewStart > 0) preview = "..." + preview;
-        if (previewEnd < text.length) preview = preview + "...";
-
-        if (currentQuery) {
-          const regex = new RegExp(`(${currentQuery.split(/\s+/).join("|")})`, "gi");
-          preview = preview.replace(regex, "<mark>$1</mark>");
-        }
-        matchPreview = `<div class="ytc-match-preview">${preview}</div>`;
-      }
+    const transcriptMatch = item._matches?.find((x) => x.key === "searchableTranscript");
+    if (transcriptMatch?.indices.length) {
+      const text = item.transcript || "";
+      const [start] = transcriptMatch.indices[0];
+      const from = Math.max(0, start - 30);
+      const to = Math.min(text.length, start + 110);
+      const snippet = `${from > 0 ? "…" : ""}${text.slice(from, to)}${to < text.length ? "…" : ""}`;
+      matchPreview = `<div class="ytc-match-preview">${highlight(snippet, currentQuery)}</div>`;
     }
 
     return `
@@ -272,307 +176,249 @@ export const showDashboard = async (
       <img class="ytc-thumb" src="https://i.ytimg.com/vi/${esc(item.id)}/mqdefault.jpg" loading="lazy" alt="">
       <div class="ytc-info">
         <div class="ytc-title">
-          <a href="${esc(item.url)}" target="_blank">${esc(item.title)}</a>
-          ${hasScore ? `<span class="ytc-score">${scorePercent}% eşleşme</span>` : ""}
+          <a href="#" data-view="${esc(item.id)}" title="${esc(item.title)}">${esc(item.title)}</a>
+          ${scorePercent !== null ? `<span class="ytc-score">%${scorePercent} eşleşme</span>` : ""}
         </div>
         <div class="ytc-meta">
           <span>${icons.tv} ${esc(item.channel || "Bilinmiyor")}</span>
           <span>${icons.calendar} ${formatDate(item.date)}</span>
-          <span>${icons.hash} ~${item.tokens || 0} token</span>
-          ${item.copyCount > 1 ? `<span>${icons.copy} ${item.copyCount}x</span>` : ""}
+          <span>${icons.hash} ~${(item.tokens || 0).toLocaleString("tr-TR")} token</span>
+          ${item.copyCount > 1 ? `<span>${icons.copy} ${item.copyCount}×</span>` : ""}
+          ${item.userSummary ? `<span>${icons.sparkles} Özet</span>` : ""}
         </div>
         <div class="ytc-tags">
           ${(item.tags || []).map((t) => `<span class="ytc-tag">${esc(t)}</span>`).join("")}
-          ${item.translations && Object.keys(item.translations).length > 0 ? Object.keys(item.translations).map((c) => `<span class="ytc-tag" style="background:rgba(76,175,80,.15);color:#66bb6a">${icons.translate} ${c.toUpperCase()}</span>`).join("") : ""}
+          ${langTags(item)}
         </div>
         ${matchPreview}
       </div>
       <div class="ytc-actions">
-        <button class="ytc-action-btn fav ${item.favorite ? "active" : ""}" data-fav="${esc(item.id)}" title="Favori">${icons.star}</button>
-        <button class="ytc-action-btn" data-copy="${esc(item.id)}" title="Tekrar Kopyala">${icons.clipboard}</button>
-        <button class="ytc-action-btn" data-view="${esc(item.id)}" title="Görüntüle">${icons.eye}</button>
-        <button class="ytc-action-btn delete" data-delete="${esc(item.id)}" title="Sil">${icons.trash}</button>
+        <button class="ytc-action-btn fav ${item.favorite ? "active" : ""}" data-fav="${esc(item.id)}" aria-pressed="${item.favorite}" title="Favori" aria-label="Favori">${item.favorite ? icons.starFilled : icons.star}</button>
+        <button class="ytc-action-btn" data-copy="${esc(item.id)}" title="Transkripti kopyala" aria-label="Transkripti kopyala">${icons.clipboard}</button>
+        <button class="ytc-action-btn" data-view="${esc(item.id)}" title="Görüntüle" aria-label="Görüntüle">${icons.eye}</button>
+        <button class="ytc-action-btn delete" data-delete="${esc(item.id)}" title="Sil" aria-label="Sil">${icons.trash}</button>
       </div>
-    </div>
-  `;
-  };
-
-  const renderEmpty = (msg: string): string => `
-    <div class="ytc-empty">
-      <div class="ytc-empty-icon">${icons.inbox}</div>
-      <div class="ytc-empty-text">${msg}</div>
-    </div>
-  `;
-
-  const renderSearchStats = (count: number, time: number) => {
-    const hint = bg.querySelector(".ytc-search-hint") as HTMLElement | null;
-    if (hint) {
-      setHTML(
-        hint,
-        currentQuery
-          ? `${icons.sparkles} ${count} sonuç bulundu (${time}ms)`
-          : `${icons.lightbulb} Fuzzy arama: yazım hataları tolere edilir, benzer sonuçlar bulunur`,
-      );
-    }
+    </div>`;
   };
 
   const loadHistory = async () => {
-    setHTML(historyList, '<div class="ytc-loading"><div class="ytc-spinner"></div>Aranıyor...</div>');
-    searchStartTime = performance.now();
-
-    const items = await db.searchWithFilters(currentQuery, {
-      tag: tagFilter.value,
-      channel: channelFilter.value,
-    });
-
-    const searchTime = Math.round(performance.now() - searchStartTime);
-
+    const t0 = performance.now();
+    const items = await db.searchWithFilters(currentQuery, { tag: tagFilter.value, channel: channelFilter.value });
+    const ms = Math.round(performance.now() - t0);
     setHTML(
       historyList,
       items.length
         ? items.map(renderItem).join("")
-        : renderEmpty(currentQuery ? `"${currentQuery}" için sonuç bulunamadı` : "Henüz kayıt yok"),
+        : currentQuery || tagFilter.value || channelFilter.value
+          ? emptyHtml("Sonuç bulunamadı", "Farklı bir arama deneyin veya filtreleri temizleyin.")
+          : emptyHtml("Kütüphane boş", "Bir videoda “Transkript” düğmesine basarak ilk kaydınızı oluşturun."),
     );
-
-    renderSearchStats(items.length, searchTime);
+    setHTML(
+      q<HTMLElement>("#ytc-search-hint"),
+      currentQuery
+        ? `${icons.search} ${items.length} sonuç · ${ms} ms`
+        : `${icons.lightbulb} Bulanık arama: yazım hataları tolere edilir`,
+    );
   };
 
   const loadFavorites = async (query = "") => {
-    setHTML(favoritesList, '<div class="ytc-loading"><div class="ytc-spinner"></div>Yükleniyor...</div>');
-
     let items: SearchResult[] = await db.getFavorites();
-    if (query) {
-      items = await searchManager.search(query, items);
-    }
-
+    if (query) items = await searchManager.search(query, items);
     setHTML(
       favoritesList,
       items.length
         ? items.map(renderItem).join("")
-        : renderEmpty(query ? `"${query}" için favori bulunamadı` : "Henüz favori yok"),
+        : emptyHtml(query ? "Favorilerde sonuç yok" : "Henüz favori yok", query ? "" : "Yıldız simgesiyle kayıtları favorilere ekleyin."),
     );
-  };
-
-  const translationsList = bg.querySelector("#ytc-translations-list") as HTMLElement;
-
-  const renderTranslationItem = (item: TranscriptRecord): string => {
-    const langs = Object.keys(item.translations || {});
-    return `
-    <div class="ytc-item" data-id="${esc(item.id)}">
-      <img class="ytc-thumb" src="https://i.ytimg.com/vi/${esc(item.id)}/mqdefault.jpg" loading="lazy" alt="">
-      <div class="ytc-info">
-        <div class="ytc-title">
-          <a href="${esc(item.url)}" target="_blank">${esc(item.title)}</a>
-        </div>
-        <div class="ytc-meta">
-          <span>${icons.tv} ${esc(item.channel || "Bilinmiyor")}</span>
-          <span>${icons.calendar} ${formatDate(item.date)}</span>
-        </div>
-        <div class="ytc-tags">
-          ${langs.map((lang) => `<button class="ytc-tag" style="background:rgba(76,175,80,.15);color:#66bb6a;cursor:pointer;border:0" data-show-translation="${esc(item.id)}:${esc(lang)}">${icons.translate} ${lang.toUpperCase()}</button>`).join("")}
-          ${langs.map((lang) => `<button class="ytc-tag" style="background:rgba(255,215,0,.15);color:#ffd700;cursor:pointer;border:0" data-play-subs="${esc(item.id)}:${esc(lang)}">${icons.subtitles} ${lang.toUpperCase()} Altyazı</button>`).join("")}
-        </div>
-      </div>
-      <div class="ytc-actions">
-        <button class="ytc-action-btn" data-view="${esc(item.id)}" title="Görüntüle">${icons.eye}</button>
-        ${langs.map((lang) => `<button class="ytc-action-btn delete" data-del-translation="${esc(item.id)}:${esc(lang)}" title="${lang.toUpperCase()} çevirisini sil">${icons.trash}</button>`).join("")}
-      </div>
-    </div>
-  `;
   };
 
   const loadTranslations = async () => {
     const all = await db.getAll();
-    const withTranslations = all.filter((item) => item.translations && Object.keys(item.translations).length > 0);
-
+    const items = all.filter((x) => x.translations && Object.keys(x.translations).length);
+    const overlay = getOverlayState();
     setHTML(
       translationsList,
-      withTranslations.length
-        ? withTranslations.map(renderTranslationItem).join("")
-        : renderEmpty("Henüz çeviri yok. Video sayfasında 'Çevir' butonunu kullanarak çeviri yapabilirsiniz."),
+      items.length
+        ? items
+            .map((item) => {
+              const langs = Object.keys(item.translations!);
+              return `<div class="ytc-item" data-id="${esc(item.id)}">
+                <img class="ytc-thumb" src="https://i.ytimg.com/vi/${esc(item.id)}/mqdefault.jpg" loading="lazy" alt="">
+                <div class="ytc-info">
+                  <div class="ytc-title"><a href="#" data-view="${esc(item.id)}" title="${esc(item.title)}">${esc(item.title)}</a></div>
+                  <div class="ytc-meta"><span>${icons.tv} ${esc(item.channel || "Bilinmiyor")}</span><span>${icons.calendar} ${formatDate(item.date)}</span></div>
+                  <div class="ytc-tags">
+                    ${langs
+                      .map((c) => {
+                        const on = overlay?.videoId === item.id && overlay.lang === c;
+                        return `<span style="display:inline-flex;gap:4px">
+                          <button class="ytc-tag lang" data-open-translation="${esc(item.id)}" data-lang="${esc(c)}">${icons.translate} ${esc(getLanguage(c).name)}</button>
+                          <button class="ytc-tag ${on ? "" : "neutral"}" data-play-subs="${esc(item.id)}" data-lang="${esc(c)}" title="${on ? "Altyazıyı kapat" : "Videoyu altyazıyla oynat"}">${icons.subtitles} ${on ? "Açık" : "Oynat"}</button>
+                          <button class="ytc-tag neutral" data-del-translation="${esc(item.id)}" data-lang="${esc(c)}" title="${esc(getLanguage(c).name)} çeviriyi sil" aria-label="${esc(getLanguage(c).name)} çeviriyi sil">${icons.trash}</button>
+                        </span>`;
+                      })
+                      .join("")}
+                  </div>
+                </div>
+              </div>`;
+            })
+            .join("")
+        : emptyHtml("Henüz çeviri yok", "Bir videoda “Çevir” düğmesine basın; çeviri kaydedilir ve altyazı olarak gösterilir."),
     );
   };
 
-  loadHistory();
-  loadFavorites();
-  loadTranslations();
-
-  tabs.forEach((tab) => {
-    tab.addEventListener("click", () => {
-      tabs.forEach((t) => t.classList.remove("active"));
-      tabContents.forEach((c) => c.classList.remove("active"));
-      tab.classList.add("active");
-      bg.querySelector(`#tab-${(tab as HTMLElement).dataset.tab}`)?.classList.add("active");
-    });
-  });
-
-  const doSearch = debounce(() => {
-    currentQuery = searchInput.value.trim();
-    loadHistory();
-  }, CONFIG.DEBOUNCE_MS);
-
-  const doFavSearch = debounce(() => {
-    loadFavorites(favSearchInput.value.trim());
-  }, CONFIG.DEBOUNCE_MS);
-
-  searchInput.addEventListener("input", doSearch);
-  favSearchInput.addEventListener("input", doFavSearch);
-  tagFilter.addEventListener("change", loadHistory);
-  channelFilter.addEventListener("change", loadHistory);
-  bg.querySelector("#ytc-refresh")?.addEventListener("click", () => {
-    searchManager.invalidate();
-    loadHistory();
-  });
-
-  bg.querySelector("#ytc-rebuild-index")?.addEventListener("click", async () => {
-    searchManager.invalidate();
-    const items = await db.getAll();
-    await searchManager.buildIndex(items);
-    showToast(`Index yenilendi (${searchManager.lastIndexTime.toFixed(0)}ms)`);
-  });
-
-  const close = () => {
-    bg.remove();
-    updateNavbarBadge();
+  const reloadAll = () => {
+    void loadHistory();
+    void loadFavorites(favSearchInput.value.trim());
+    void loadTranslations();
   };
 
-  bg.addEventListener("click", async (e) => {
+  const setTab = (next: DashTab) => {
+    tab = next;
+    m.dialog.querySelectorAll<HTMLElement>(".ytc-tab").forEach((t) => {
+      const active = t.dataset.tab === tab;
+      t.classList.toggle("active", active);
+      t.setAttribute("aria-selected", String(active));
+    });
+    m.dialog.querySelectorAll(".ytc-tab-content").forEach((c) => c.classList.toggle("active", c.id === `tab-${tab}`));
+  };
+
+  setTab(tab);
+  reloadAll();
+  if (tab === "history") searchInput.focus();
+
+  searchInput.addEventListener(
+    "input",
+    debounce(() => {
+      currentQuery = searchInput.value.trim();
+      void loadHistory();
+    }, CONFIG.DEBOUNCE_MS),
+  );
+  favSearchInput.addEventListener("input", debounce(() => void loadFavorites(favSearchInput.value.trim()), CONFIG.DEBOUNCE_MS));
+  tagFilter.addEventListener("change", () => void loadHistory());
+  channelFilter.addEventListener("change", () => void loadHistory());
+
+  const openViewer = async (id: string, tabName: "original" | "translation" = "original", lang?: string) => {
+    const item = await db.get(id);
+    if (!item) return showToast("Kayıt bulunamadı", "error");
+    showTranscriptViewer(item, { query: currentQuery, tab: tabName, lang });
+  };
+
+  m.dialog.addEventListener("click", async (e) => {
     const target = e.target as HTMLElement;
+    const el = <T extends string>(attr: T) => target.closest<HTMLElement>(`[${attr}]`);
 
-    if (target === bg || target.closest(".ytc-modal-close") || target.closest('[data-action="close"]'))
-      close();
+    const tabEl = target.closest<HTMLElement>(".ytc-tab");
+    if (tabEl) return setTab(tabEl.dataset.tab as DashTab);
 
-    const favBtn = target.closest("[data-fav]") as HTMLElement | null;
-    if (favBtn) {
-      const id = favBtn.dataset.fav!;
-      const item = await db.get(id);
-      if (item) {
-        await db.update(id, { favorite: !item.favorite });
-        favBtn.classList.toggle("active");
-        favBtn.closest(".ytc-item")?.classList.toggle("favorite");
-        loadFavorites(favSearchInput.value.trim());
-      }
-    }
-
-    const copyBtn = target.closest("[data-copy]") as HTMLElement | null;
-    if (copyBtn) {
-      const id = copyBtn.dataset.copy!;
-      const item = await db.get(id);
-      if (item?.transcript) {
-        GM_setClipboard(item.transcript);
-        await db.update(id, { copyCount: (item.copyCount || 1) + 1 });
-        showToast("Tekrar kopyalandı!");
-      } else {
-        showToast("Transkript bulunamadı", "error");
-      }
-    }
-
-    const viewBtn = target.closest("[data-view]") as HTMLElement | null;
+    const viewBtn = el("data-view");
     if (viewBtn) {
-      const id = viewBtn.dataset.view!;
-      const item = await db.get(id);
-      if (item) showTranscriptViewer(item, currentQuery);
+      e.preventDefault();
+      return void openViewer(viewBtn.dataset.view!);
     }
 
-    const deleteBtn = target.closest("[data-delete]") as HTMLElement | null;
+    const openTr = el("data-open-translation");
+    if (openTr) return void openViewer(openTr.dataset.openTranslation!, "translation", openTr.dataset.lang);
+
+    const favBtn = el("data-fav");
+    if (favBtn) {
+      const item = await db.get(favBtn.dataset.fav!);
+      if (!item) return;
+      await db.update(item.id, { favorite: !item.favorite });
+      reloadAll();
+      return;
+    }
+
+    const copyBtn = el("data-copy");
+    if (copyBtn) {
+      const item = await db.get(copyBtn.dataset.copy!);
+      if (!item?.transcript) return showToast("Transkript bulunamadı", "error");
+      GM_setClipboard(item.transcript);
+      await db.update(item.id, { copyCount: (item.copyCount || 0) + 1 });
+      return showToast("Panoya kopyalandı");
+    }
+
+    const deleteBtn = el("data-delete");
     if (deleteBtn) {
+      const item = await db.get(deleteBtn.dataset.delete!);
+      if (!(await confirmDialog(`“${truncate(item?.title ?? "", 60)}” kaydı, çevirileri ve özetiyle birlikte silinecek.`, "Sil", true))) return;
       const id = deleteBtn.dataset.delete!;
-      if (confirm("Bu kaydı silmek istediğine emin misin?")) {
-        await db.delete(id);
-        deleteBtn.closest(".ytc-item")?.remove();
-        loadFavorites(favSearchInput.value.trim());
-        loadTranslations();
-        showToast("Silindi");
-      }
+      cancelJobsFor(id);
+      if (getOverlayState()?.videoId === id) hideSubtitles();
+      await db.delete(id);
+      reloadAll();
+      void updateNavbarBadge();
+      return showToast("Kayıt silindi");
     }
 
-    // Translation tab actions
-    const showTransBtn = target.closest("[data-show-translation]") as HTMLElement | null;
-    if (showTransBtn) {
-      const [id, lang] = showTransBtn.dataset.showTranslation!.split(":");
-      const item = await db.get(id);
-      const translated = item?.translations?.[lang];
-      if (translated) {
-        showTranslationViewer(item!, lang, translated);
-      } else {
-        showToast("Çeviri bulunamadı", "error");
+    const playBtn = el("data-play-subs");
+    if (playBtn) {
+      const id = playBtn.dataset.playSubs!;
+      const lang = playBtn.dataset.lang!;
+      const overlay = getOverlayState();
+      if (overlay?.videoId === id && overlay.lang === lang) {
+        hideSubtitles();
+        return void loadTranslations();
       }
-    }
-
-    const playSubsBtn = target.closest("[data-play-subs]") as HTMLElement | null;
-    if (playSubsBtn) {
-      const [id, lang] = playSubsBtn.dataset.playSubs!.split(":");
-      const item = await db.get(id);
-      const translated = item?.translations?.[lang];
-      if (translated) {
-        if (isOverlayActive()) {
-          hideSubtitleOverlay();
-          showToast("Altyazı kapatıldı");
-        } else {
-          const cues = parseCuesFromTranslatedText(translated);
-          if (cues.length > 0) {
-            showSubtitleOverlay(cues);
-            showToast("Altyazı açıldı — videoya gidin");
-          } else {
-            showToast("Altyazı ayrıştırılamadı", "error");
-          }
+      try {
+        const r = await showSubtitles(id, lang);
+        if (r === "shown") {
+          m.close();
+          showToast(`${getLanguage(lang).name} altyazı açık`);
         }
+      } catch (err) {
+        showToast((err as Error).message, "error");
       }
+      return;
     }
 
-    const delTransBtn = target.closest("[data-del-translation]") as HTMLElement | null;
-    if (delTransBtn) {
-      const [id, lang] = delTransBtn.dataset.delTranslation!.split(":");
-      if (confirm(`${lang.toUpperCase()} çevirisini silmek istediğine emin misin?`)) {
-        const item = await db.get(id);
-        if (item?.translations?.[lang]) {
-          delete item.translations[lang];
-          await db.update(id, { translations: item.translations });
-          loadTranslations();
-          loadHistory();
-          showToast("Çeviri silindi");
-        }
+    const delTr = el("data-del-translation");
+    if (delTr) {
+      const lang = delTr.dataset.lang!;
+      if (!(await confirmDialog(`${getLanguage(lang).name} çeviri silinecek.`, "Sil", true))) return;
+      await db.deleteTranslation(delTr.dataset.delTranslation!, lang);
+      const overlay = getOverlayState();
+      if (overlay && overlay.videoId === delTr.dataset.delTranslation && overlay.lang === lang) hideSubtitles();
+      reloadAll();
+      return showToast("Çeviri silindi");
+    }
+
+    switch (target.closest<HTMLElement>("[data-action]")?.dataset.action) {
+      case "open-settings":
+        return openSettings();
+      case "export": {
+        downloadText(`subscribe-yedek-${new Date().toISOString().slice(0, 10)}.json`, await db.export(), "application/json");
+        return showToast("Yedek indirildi");
       }
-    }
-
-    if (target.closest("#ytc-export")) {
-      const json = await db.export();
-      const blob = new Blob([json], { type: "application/json" });
-      Object.assign(document.createElement("a"), {
-        href: URL.createObjectURL(blob),
-        download: `transcript-backup-${new Date().toISOString().slice(0, 10)}.json`,
-      }).click();
-      showToast("Dışa aktarıldı!");
-    }
-
-    if (target.closest("#ytc-clear-all")) {
-      if (confirm("TÜM VERİLER SİLİNECEK! Emin misin?")) {
+      case "rebuild-index": {
+        searchManager.invalidate();
+        await searchManager.buildIndex(await db.getAll());
+        return showToast(`Arama dizini yenilendi (${searchManager.lastIndexTime.toFixed(0)} ms)`);
+      }
+      case "clear-all": {
+        if (!(await confirmDialog("Kütüphanedeki TÜM kayıtlar, çeviriler ve özetler kalıcı olarak silinecek. Önce yedek almanız önerilir.", "Hepsini sil", true))) return;
+        cancelAllJobs();
+        hideSubtitles();
         await db.clear();
-        close();
-        showToast("Tüm veriler silindi");
+        m.close();
+        return showToast("Tüm kayıtlar silindi");
       }
     }
   });
 
-  (bg.querySelector("#ytc-import") as HTMLInputElement).addEventListener("change", async (e) => {
-    const file = (e.target as HTMLInputElement).files?.[0];
+  q<HTMLInputElement>("#ytc-import").addEventListener("change", async (e) => {
+    const input = e.target as HTMLInputElement;
+    const file = input.files?.[0];
     if (!file) return;
-
     try {
-      const text = await file.text();
-      const count = await db.import(text);
-      showToast(`${count} kayıt içe aktarıldı!`);
-      loadHistory();
-      loadFavorites();
+      const count = await db.import(await file.text());
+      showToast(`${count} kayıt içe aktarıldı`);
+      reloadAll();
+      void updateNavbarBadge();
     } catch (err) {
-      showToast("İçe aktarma başarısız: " + (err as Error).message, "error");
-    }
-  });
-
-  document.addEventListener("keydown", function handler(e) {
-    if (e.key === "Escape") {
-      close();
-      document.removeEventListener("keydown", handler);
+      showToast(`İçe aktarma başarısız: ${(err as Error).message}`, "error");
+    } finally {
+      input.value = "";
     }
   });
 };
