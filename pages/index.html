@@ -3,13 +3,20 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SubScribe — YouTube Transcript Manager</title>
-  <meta name="description" content="Extract, search, translate, summarize, and overlay YouTube transcripts. Powered by AI, stored locally.">
-  <meta property="og:title" content="SubScribe — YouTube Transcript Manager">
-  <meta property="og:description" content="Extract, search, translate, summarize, and overlay YouTube transcripts with AI-powered tools.">
+  <title>SubScribe — Any YouTube video, in your language</title>
+  <meta name="description" content="Free userscript that translates YouTube videos into natural, sentence-level AI subtitles synced to the millisecond — plus transcripts, summaries and a local library.">
+  <meta name="theme-color" content="#050505">
+  <link rel="canonical" href="https://umitaltintas.github.io/subscribe/">
+  <meta property="og:title" content="SubScribe — Any YouTube video, in your language">
+  <meta property="og:description" content="Natural, sentence-level AI translations shown as subtitles synced to the millisecond, right in the YouTube player.">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://umitaltintas.github.io/subscribe/">
-  <meta property="og:image" content="https://umitaltintas.github.io/subscribe/og-image.svg">
+  <meta property="og:image" content="https://raw.githubusercontent.com/umitaltintas/subscribe/main/pages/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="SubScribe — Any YouTube video, in your language">
+  <meta name="twitter:card" content="summary_large_image">
+  <script>document.documentElement.classList.add('js');</script>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><defs><linearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'><stop offset='0%25' stop-color='%23FF3B30'/><stop offset='50%25' stop-color='%23FF2D55'/><stop offset='100%25' stop-color='%23AF52DE'/></linearGradient></defs><rect width='512' height='512' rx='112' fill='%2309090B'/><rect x='160' y='128' width='56' height='256' rx='28' fill='url(%23g)'/><rect x='240' y='176' width='56' height='160' rx='28' fill='url(%23g)'/><rect x='320' y='224' width='56' height='64' rx='28' fill='url(%23g)'/></svg>">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -71,13 +78,14 @@
     /* ═══════════════════════════════════════
        SCROLL REVEAL SYSTEM
        ═══════════════════════════════════════ */
-    .reveal {
+    /* Only hide when JS runs, so content stays visible without it. */
+    .js .reveal {
       opacity: 0;
       transform: translateY(40px);
       transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1),
                   transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
     }
-    .reveal.visible {
+    .js .reveal.visible {
       opacity: 1;
       transform: translateY(0);
     }
@@ -574,24 +582,35 @@
     }
 
     .demo-section .progress-bar { position: absolute; bottom: 0; left: 0; right: 0; height: 3px; background: rgba(255,255,255,0.1); z-index: 3; }
-    .demo-section .progress-fill { height: 100%; width: 0%; background: var(--red); border-radius: 0 2px 2px 0; animation: progressAnim 16s linear infinite; }
-    @keyframes progressAnim { 0% { width: 22%; } 100% { width: 78%; } }
+    .demo-section .progress-fill { height: 100%; width: 26.4%; background: var(--red); border-radius: 0 2px 2px 0; transition: width 0.4s linear; }
 
-    .demo-section .subtitle-overlay { position: absolute; bottom: 28px; left: 50%; transform: translateX(-50%); z-index: 4; text-align: center; pointer-events: none; }
+    .demo-section .subtitle-overlay { position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); width: 88%; z-index: 4; text-align: center; pointer-events: none; }
     .demo-section .subtitle-line {
-      display: inline-block; background: rgba(0,0,0,0.82); color: #fff;
-      font-size: clamp(11px, 1.4vw, 16px); font-weight: 500;
-      padding: 4px 14px; border-radius: 4px; white-space: nowrap;
+      display: inline-block; background: rgba(0,0,0,0.78); color: #FFD60A;
+      font-size: clamp(11px, 1.45vw, 17px); font-weight: 600; line-height: 1.35;
+      padding: 5px 14px; border-radius: 6px;
       opacity: 0; transform: translateY(6px);
-      transition: opacity 0.5s ease, transform 0.5s ease;
+      transition: opacity 0.35s ease, transform 0.35s ease;
     }
     .demo-section .subtitle-line.visible { opacity: 1; transform: translateY(0); }
-    .demo-section .subtitle-lang {
-      display: block; font-family: var(--font-mono); font-size: 9px;
-      color: var(--red); margin-top: 4px; opacity: 0;
-      transition: opacity 0.4s ease 0.2s; text-transform: uppercase; letter-spacing: 0.08em;
+    .demo-section .subtitle-orig {
+      display: block; color: rgba(255,255,255,0.75); font-weight: 500;
+      font-size: 0.78em; margin-top: 2px;
     }
-    .demo-section .subtitle-line.visible .subtitle-lang { opacity: 0.8; }
+    .demo-section .demo-osd {
+      position: absolute; top: 14px; right: 14px; z-index: 5;
+      display: flex; align-items: center; gap: 8px;
+      background: rgba(0,0,0,0.78); color: #fff; border-radius: 8px;
+      padding: 6px 10px; font-family: var(--font-mono); font-size: 12px;
+      opacity: 0; transform: translateY(-4px); transition: opacity 0.25s, transform 0.25s;
+    }
+    .demo-section .demo-osd.visible { opacity: 1; transform: none; }
+    .demo-section .demo-osd kbd {
+      font-family: var(--font-mono); font-size: 11px; min-width: 20px; text-align: center;
+      padding: 1px 6px; border-radius: 4px; background: var(--surface-3);
+      border: 1px solid var(--border-light); border-bottom-width: 2px; transition: transform 0.1s, background 0.1s;
+    }
+    .demo-section .demo-osd kbd.pressed { transform: translateY(1px); background: var(--red); border-color: var(--red); }
 
     .demo-section .video-controls {
       display: flex; align-items: center; justify-content: space-between;
@@ -602,7 +621,7 @@
     .demo-section .ctrl-time { font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); margin-left: 4px; }
 
     .demo-section .subscribe-actions {
-      display: flex; align-items: center; gap: 8px;
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
       padding: 10px 12px; background: var(--surface); border-top: 1px solid rgba(255,255,255,0.03);
     }
     .demo-section .sub-btn {
@@ -654,11 +673,17 @@
     .demo-section .transcript-entry { display: flex; gap: 8px; padding: 7px 14px; transition: background 0.2s; align-items: flex-start; }
     .demo-section .transcript-entry.highlighted { background: rgba(255,45,85,0.06); }
     .demo-section .transcript-entry.active { background: rgba(255,45,85,0.1); border-left: 2px solid var(--red); padding-left: 12px; }
-    .demo-section .entry-time { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); min-width: 36px; padding-top: 1px; flex-shrink: 0; }
+    .demo-section .entry-time { font-family: var(--font-mono); font-size: 10px; color: var(--text-muted); min-width: 56px; padding-top: 1px; flex-shrink: 0; }
     .demo-section .transcript-entry.active .entry-time { color: var(--red); }
     .demo-section .entry-text { font-size: 12px; color: var(--text-dim); line-height: 1.45; }
     .demo-section .transcript-entry.active .entry-text { color: var(--text); }
-    .demo-section .fuzzy-match { background: rgba(255,45,85,0.2); color: var(--text); padding: 0 2px; border-radius: 2px; font-weight: 600; }
+    .demo-section .transcript-entry.grouped { background: rgba(175,82,222,0.1); border-left: 2px solid var(--purple); padding-left: 12px; }
+    .demo-section .transcript-entry.grouped .entry-text { color: var(--text); }
+    .demo-section .entry-body { display: flex; flex-direction: column; gap: 3px; }
+    .demo-section .entry-span { font-family: var(--font-mono); font-size: 9px; color: var(--purple); letter-spacing: 0.04em; }
+    .demo-section .tr-entry { opacity: 0; transform: translateY(6px); transition: opacity 0.4s, transform 0.4s, background 0.2s; }
+    .demo-section .tr-entry.shown { opacity: 1; transform: none; }
+    .demo-section .transcript-list[hidden] { display: none; }
 
     .demo-section .panel-tabs { display: flex; border-bottom: 1px solid var(--border); padding: 0 14px; }
     .demo-section .panel-tab { padding: 8px 12px; font-size: 11px; font-weight: 600; color: var(--text-muted); position: relative; transition: color 0.3s; }
@@ -710,6 +735,11 @@
       background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
     }
 
+    .feature-card code, .faq-answer code {
+      font-family: var(--font-mono); font-size: 0.85em; padding: 0.05rem 0.4rem;
+      background: var(--surface-3); border: 1px solid var(--border-light); border-radius: 4px; color: var(--text);
+    }
+
     /* ═══════════════════════════════════════
        HOW IT WORKS
        ═══════════════════════════════════════ */
@@ -754,6 +784,8 @@
       background: rgba(34, 197, 94, 0.08); border: 1px solid rgba(34, 197, 94, 0.2); border-radius: 100px;
     }
     .browser-status svg { width: 14px; height: 14px; flex-shrink: 0; }
+    .browser-status.untested { color: var(--text-dim); background: var(--surface-3); border-color: var(--border-light); }
+    .browser-note { margin-top: 1.25rem; color: var(--text-muted); font-size: 0.85rem; }
 
     /* ═══════════════════════════════════════
        TECH STACK
@@ -794,7 +826,7 @@
     /* ═══════════════════════════════════════
        CTA SECTION
        ═══════════════════════════════════════ */
-    .cta-section { text-align: center; position: relative; padding: 8rem 2rem; }
+    .cta-section { text-align: center; position: relative; padding: 8rem 2rem; overflow: hidden; }
     .cta-section::before {
       content: ''; position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
       width: 600px; height: 600px;
@@ -875,6 +907,7 @@
       body.menu-open { overflow: hidden; }
       section { padding: 4rem 1.25rem; }
       .demo-section { padding: 4rem 1.25rem; }
+      .demo-section .play-btn { display: none; }
       .hero { padding: 7rem 1.25rem 4rem; }
       .features-grid { grid-template-columns: 1fr; }
       .feature-card.featured { grid-column: span 1; }
@@ -888,14 +921,26 @@
       .stats-bar__item { flex: 1 1 50%; max-width: none; padding: 20px 8px; }
       .stats-bar__number { font-size: 2.2rem; }
     }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        animation-delay: 0s !important;
+        transition-duration: 0.01ms !important;
+        transition-delay: 0s !important;
+      }
+      html { scroll-behavior: auto; }
+      .js .reveal { opacity: 1; transform: none; }
+    }
   </style>
 </head>
 <body>
 
   <!-- ─── NAVIGATION ─── -->
   <nav>
-    <a href="#" class="nav-brand">
-      <svg class="nav-logo" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+    <a href="#" class="nav-brand" aria-label="SubScribe home">
+      <svg class="nav-logo" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
         <defs><linearGradient id="navGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#FF3B30"/><stop offset="50%" stop-color="#FF2D55"/><stop offset="100%" stop-color="#AF52DE"/></linearGradient></defs>
         <rect width="512" height="512" rx="112" fill="#09090B"/>
         <rect x="160" y="128" width="56" height="256" rx="28" fill="url(#navGrad)"/>
@@ -906,50 +951,50 @@
     </a>
     <ul class="nav-links">
       <li><a href="#features">Features</a></li>
-      <li><a href="#install">Install</a></li>
-      <li><a href="#tech">Tech</a></li>
+      <li><a href="#install">Get started</a></li>
+      <li><a href="#faq">FAQ</a></li>
       <li><a href="https://github.com/umitaltintas/subscribe" target="_blank" rel="noopener">GitHub <span class="gh-stars-badge" id="gh-stars-badge" data-state="hidden">&#9733; <span id="gh-stars-count">0</span></span></a></li>
       <li><a href="subscribe.user.js" class="nav-cta">Install</a></li>
     </ul>
-    <button class="hamburger" aria-label="Open menu" aria-expanded="false">
+    <button class="hamburger" aria-label="Open menu" aria-expanded="false" aria-controls="mobile-menu">
       <span></span><span></span><span></span>
     </button>
   </nav>
 
   <!-- Mobile menu -->
   <div class="mobile-overlay" aria-hidden="true"></div>
-  <div class="mobile-menu" role="dialog" aria-label="Mobile navigation">
+  <div class="mobile-menu" id="mobile-menu" role="navigation" aria-label="Mobile navigation" inert>
     <a href="#features">Features</a>
-    <a href="#install">Install</a>
-    <a href="#tech">Tech</a>
+    <a href="#install">Get started</a>
+    <a href="#faq">FAQ</a>
     <a href="https://github.com/umitaltintas/subscribe" target="_blank" rel="noopener">GitHub</a>
     <a href="subscribe.user.js" class="mobile-cta">Install SubScribe</a>
   </div>
 
+  <main>
   <!-- ─── HERO ─── -->
   <section class="hero">
     <div class="hero-grid"></div>
-    <div class="floating-cards">
-      <div class="float-card">&#9654; transcript.extract()</div>
-      <div class="float-card">&#128269; fuzzy.search("quantum")</div>
-      <div class="float-card">&#127760; ai.translate("ja")</div>
-      <div class="float-card">&#10024; ai.summarize()</div>
-      <div class="float-card">&#128190; db.save(transcript)</div>
+    <div class="floating-cards" aria-hidden="true">
+      <div class="float-card">captions.load() // ms timing</div>
+      <div class="float-card">ai.translate("tr")</div>
+      <div class="float-card">subtitles.offset(+0.3)</div>
+      <div class="float-card">export("srt")</div>
     </div>
     <div class="hero-content">
       <div class="hero-badge">
         <span class="dot"></span>
-        v1.0.0 — Tampermonkey Userscript
+        <span><span id="hero-version">v1.5.0</span> — Free userscript for YouTube</span>
       </div>
-      <h1>YouTube Transcripts,<br><span class="accent">Supercharged</span></h1>
-      <p class="hero-sub">Extract, search, translate, summarize, and overlay transcripts on any YouTube video. AI-powered. Locally stored. Zero accounts needed.</p>
+      <h1>Any YouTube video<br><span class="accent">in your language</span></h1>
+      <p class="hero-sub">SubScribe translates a video's captions sentence by sentence with AI and shows them as subtitles synced to the millisecond — right in the YouTube player. Transcripts, summaries and a local library included.</p>
       <div class="hero-actions">
         <a href="subscribe.user.js" class="btn btn-primary">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Install UserScript
         </a>
         <a href="https://github.com/umitaltintas/subscribe" class="btn btn-ghost" target="_blank" rel="noopener">
-          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
           View Source
         </a>
       </div>
@@ -957,22 +1002,22 @@
   </section>
 
   <!-- ─── STATS BAR ─── -->
-  <section class="stats-bar" id="stats-bar">
+  <section class="stats-bar" id="stats-bar" aria-label="Highlights">
     <div class="stats-bar__item">
-      <div class="stats-bar__number" data-target="10" data-suffix="+">0</div>
-      <div class="stats-bar__label">Languages Supported</div>
+      <div class="stats-bar__number" data-target="18">18</div>
+      <div class="stats-bar__label">Translation languages</div>
     </div>
     <div class="stats-bar__item">
-      <div class="stats-bar__number" data-target="0" data-suffix="">0</div>
-      <div class="stats-bar__label">Accounts Required</div>
+      <div class="stats-bar__number" data-target="1" data-suffix="ms">1<span class="stats-pct">ms</span></div>
+      <div class="stats-bar__label">Subtitle timing precision</div>
     </div>
     <div class="stats-bar__item">
-      <div class="stats-bar__number" data-target="100" data-suffix="%">0</div>
-      <div class="stats-bar__label">Local Storage</div>
+      <div class="stats-bar__number" data-target="0">0</div>
+      <div class="stats-bar__label">Accounts or servers</div>
     </div>
     <div class="stats-bar__item">
-      <div class="stats-bar__number" data-target="infinity" data-suffix="">&infin;</div>
-      <div class="stats-bar__label">Videos Supported</div>
+      <div class="stats-bar__number">MIT</div>
+      <div class="stats-bar__label">Open source</div>
     </div>
   </section>
 
@@ -980,29 +1025,31 @@
   <section class="demo-section" id="demo">
     <div class="section-container">
       <div class="reveal">
-        <p class="section-label">// See It In Action</p>
-        <h2 class="section-title">Built right into YouTube</h2>
+        <p class="section-label">// See it in action</p>
+        <h2 class="section-title">Sentences, not fragments</h2>
+        <p class="section-desc">Captions break wherever the speaker pauses. SubScribe translates whole sentences, then maps each one back to the exact moment it is spoken.</p>
       </div>
     </div>
-    <div class="mockup-container reveal reveal-delay-1">
+    <div class="mockup-container reveal reveal-delay-1" aria-hidden="true">
       <div class="player-side">
         <div class="video-area">
           <div class="fake-video-content"><div class="bar"></div><div class="bar"></div><div class="bar"></div><div class="bar"></div></div>
           <div class="play-btn"></div>
+          <div class="demo-osd" id="demoOsd"><kbd id="demoKey">]</kbd><span id="demoOsdText">Subtitles +0.1 s</span></div>
           <div class="subtitle-overlay">
             <span class="subtitle-line" id="demoSubtitle">
-              <span class="subtitle-text"></span>
-              <span class="subtitle-lang"></span>
+              <span class="subtitle-text" lang="tr"></span>
+              <span class="subtitle-orig"></span>
             </span>
           </div>
-          <div class="progress-bar"><div class="progress-fill"></div></div>
+          <div class="progress-bar"><div class="progress-fill" id="demoProgress"></div></div>
         </div>
         <div class="video-controls">
           <div class="controls-left">
             <div class="ctrl-icon">&#9654;</div>
             <div class="ctrl-icon">&#9193;</div>
             <div class="ctrl-icon">&#128264;</div>
-            <span class="ctrl-time" id="demoTime">3:24</span>
+            <span class="ctrl-time" id="demoTime">3:12</span>
             <span class="ctrl-time" style="color:var(--text-muted);opacity:0.5"> / 12:07</span>
           </div>
           <div class="controls-left">
@@ -1012,16 +1059,16 @@
           </div>
         </div>
         <div class="subscribe-actions">
-          <div class="sub-btn sub-btn-transcript" id="btnTranscript"><span class="sub-btn-icon">&#9776;</span> Transcript <span class="sub-btn-badge">42 seg</span></div>
-          <div class="sub-btn sub-btn-translate" id="btnTranslate"><span class="sub-btn-icon">&#127760;</span> Translate <span class="sub-btn-badge">EN</span></div>
-          <div class="sub-btn sub-btn-translate" id="btnSummarize"><span class="sub-btn-icon">&#10024;</span> Summarize</div>
+          <div class="sub-btn sub-btn-transcript" id="btnTranscript"><span class="sub-btn-icon">&#9776;</span> Transcript</div>
+          <div class="sub-btn sub-btn-translate" id="btnTranslate"><span class="sub-btn-icon">&#127760;</span> Translate <span class="sub-btn-badge">TR &#9662;</span></div>
+          <div class="sub-btn sub-btn-translate"><span class="sub-btn-icon">&#10024;</span> Summarize</div>
         </div>
         <div class="video-meta">
           <div class="video-meta-title">Understanding Neural Networks: A Visual Guide</div>
           <div class="video-meta-channel"><span class="channel-dot">A</span> AI Academy &middot; 248K views &middot; 2 days ago</div>
         </div>
       </div>
-      <div class="transcript-panel" id="transcriptPanel">
+      <div class="transcript-panel">
         <div class="panel-header">
           <div class="panel-title-row">
             <div class="panel-title"><span class="panel-title-icon">&#9776;</span> SubScribe</div>
@@ -1029,36 +1076,38 @@
           </div>
           <div class="panel-search">
             <span class="search-icon">&#128269;</span>
-            <input type="text" class="search-input" id="demoSearch" placeholder="Fuzzy search transcript..." readonly>
-            <span class="search-shortcut">/</span>
+            <input type="text" class="search-input" placeholder="Search transcript..." readonly tabindex="-1">
           </div>
         </div>
         <div class="panel-tabs">
-          <div class="panel-tab active" id="tabTranscript">Transcript</div>
-          <div class="panel-tab" id="tabTranslation">Translation</div>
+          <div class="panel-tab active" id="tabOriginal">Original</div>
+          <div class="panel-tab" id="tabTranslation">Türkçe</div>
         </div>
-        <div class="transcript-list" id="transcriptList">
-          <div class="transcript-entry" data-idx="0"><span class="entry-time">3:12</span><span class="entry-text">A neural network is essentially a series of algorithms that try to recognize patterns.</span></div>
-          <div class="transcript-entry active" data-idx="1"><span class="entry-time">3:24</span><span class="entry-text">Each layer of the network transforms the data, learning increasingly abstract representations.</span></div>
-          <div class="transcript-entry" data-idx="2"><span class="entry-time">3:38</span><span class="entry-text">The backpropagation algorithm adjusts the weights to minimize prediction errors.</span></div>
-          <div class="transcript-entry" data-idx="3"><span class="entry-time">3:51</span><span class="entry-text">Think of gradient descent as rolling a ball down a hill to find the lowest point.</span></div>
-          <div class="transcript-entry" data-idx="4"><span class="entry-time">4:03</span><span class="entry-text">Activation functions introduce non-linearity, allowing the network to learn complex patterns.</span></div>
-          <div class="transcript-entry" data-idx="5"><span class="entry-time">4:18</span><span class="entry-text">Convolutional layers are especially powerful for image recognition tasks.</span></div>
-          <div class="transcript-entry" data-idx="6"><span class="entry-time">4:32</span><span class="entry-text">Dropout is a regularization technique that prevents overfitting during training.</span></div>
+        <div class="transcript-list" id="listOriginal">
+          <div class="transcript-entry"><span class="entry-time">3:12.480</span><span class="entry-text">A neural network is essentially</span></div>
+          <div class="transcript-entry"><span class="entry-time">3:14.920</span><span class="entry-text">a series of algorithms that learn</span></div>
+          <div class="transcript-entry"><span class="entry-time">3:17.150</span><span class="entry-text">to recognize patterns in data.</span></div>
+          <div class="transcript-entry"><span class="entry-time">3:19.600</span><span class="entry-text">Each layer transforms its input,</span></div>
+          <div class="transcript-entry"><span class="entry-time">3:22.040</span><span class="entry-text">building more abstract representations.</span></div>
+          <div class="transcript-entry"><span class="entry-time">3:25.310</span><span class="entry-text">Backpropagation then adjusts the weights</span></div>
+          <div class="transcript-entry"><span class="entry-time">3:27.880</span><span class="entry-text">to reduce the prediction error.</span></div>
         </div>
-        <div class="panel-status"><span class="status-text" id="statusText">42 segments &middot; synced</span><span class="status-dot"></span></div>
+        <div class="transcript-list" id="listTranslated" hidden>
+          <div class="transcript-entry tr-entry"><span class="entry-time">3:12.480</span><span class="entry-body"><span class="entry-text" lang="tr">Bir sinir ağı, temelde verideki örüntüleri tanımayı öğrenen bir dizi algoritmadır.</span><span class="entry-span">3 caption lines &rarr; 1 sentence</span></span></div>
+          <div class="transcript-entry tr-entry"><span class="entry-time">3:19.600</span><span class="entry-body"><span class="entry-text" lang="tr">Her katman girdisini dönüştürerek giderek daha soyut temsiller oluşturur.</span><span class="entry-span">2 caption lines &rarr; 1 sentence</span></span></div>
+          <div class="transcript-entry tr-entry"><span class="entry-time">3:25.310</span><span class="entry-body"><span class="entry-text" lang="tr">Ardından geri yayılım, tahmin hatasını azaltmak için ağırlıkları ayarlar.</span><span class="entry-span">2 caption lines &rarr; 1 sentence</span></span></div>
+        </div>
+        <div class="panel-status"><span class="status-text" id="statusText">7 caption lines &middot; ms timing</span><span class="status-dot"></span></div>
       </div>
     </div>
-    <div class="phase-indicator">
-      <div class="phase-step active" data-phase="extract"><span class="phase-dot"></span> Extract</div>
+    <div class="phase-indicator" aria-hidden="true">
+      <div class="phase-step active" data-phase="captions"><span class="phase-dot"></span> Read captions</div>
       <span class="phase-arrow">&#8594;</span>
-      <div class="phase-step" data-phase="search"><span class="phase-dot"></span> Fuzzy Search</div>
+      <div class="phase-step" data-phase="translate"><span class="phase-dot"></span> Translate sentences</div>
       <span class="phase-arrow">&#8594;</span>
-      <div class="phase-step" data-phase="translate"><span class="phase-dot"></span> Translate</div>
+      <div class="phase-step" data-phase="subtitles"><span class="phase-dot"></span> Synced subtitles</div>
       <span class="phase-arrow">&#8594;</span>
-      <div class="phase-step" data-phase="summarize"><span class="phase-dot"></span> Summarize</div>
-      <span class="phase-arrow">&#8594;</span>
-      <div class="phase-step" data-phase="overlay"><span class="phase-dot"></span> Overlay</div>
+      <div class="phase-step" data-phase="finetune"><span class="phase-dot"></span> Fine-tune</div>
     </div>
   </section>
 
@@ -1069,53 +1118,51 @@
     <div class="section-container">
       <div class="reveal">
         <p class="section-label">// Features</p>
-        <h2 class="section-title">Everything you need<br>for YouTube transcripts</h2>
-        <p class="section-desc">A complete toolkit built right into YouTube's interface. No external apps, no accounts, no data leaving your browser.</p>
+        <h2 class="section-title">Subtitles that read like<br>they were made for you</h2>
+        <p class="section-desc">Built into YouTube's own player. No extra app, no account, and your library never leaves your browser.</p>
       </div>
       <div class="features-grid">
         <div class="feature-card featured reveal reveal-delay-1">
-          <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>
-          <h3>Fuzzy Search Across Everything</h3>
-          <p>Powered by Fuse.js — search across titles, channels, tags, and full transcript content with intelligent typo tolerance. Find any moment in any video instantly.</p>
-          <span class="feature-tag">fuse.js</span>
+          <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg></div>
+          <h3>Sentence-level AI translation</h3>
+          <p>Auto-generated captions cut sentences into fragments. SubScribe first builds a context summary and glossary of names and terms, then translates whole sentences so every subtitle reads naturally — and checks that no line is skipped or merged too far. Works with Gemini, Claude, GPT and more via OpenRouter.</p>
+          <span class="feature-tag">18 languages</span> <span class="feature-tag">openrouter</span>
         </div>
         <div class="feature-card reveal reveal-delay-2">
-          <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></div>
-          <h3>One-Click Extraction</h3>
-          <p>Grab any video's full transcript with or without timestamps in a single click.</p>
+          <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2"/><path d="M9 2h6"/></svg></div>
+          <h3>Synced to the millisecond</h3>
+          <p>Timing never comes from the AI. It is taken from the caption data YouTube's player uses, so subtitles appear and disappear exactly when the words are spoken.</p>
+          <span class="feature-tag">ms timing</span>
+        </div>
+        <div class="feature-card reveal reveal-delay-2">
+          <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 12h4"/><path d="M14 12h4"/><path d="M6 16h12"/></svg></div>
+          <h3>Bilingual, your style</h3>
+          <p>Show the translation alone or with the original underneath. Choose size, color and background — YouTube's own captions step aside automatically.</p>
         </div>
         <div class="feature-card reveal reveal-delay-3">
-          <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg></div>
-          <h3>AI Translation</h3>
-          <p>Translate into 10+ languages via OpenRouter. Supports Gemini, Claude, GPT, and more.</p>
-          <span class="feature-tag">openrouter</span>
+          <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01"/><path d="M10 10h.01"/><path d="M14 10h.01"/><path d="M18 10h.01"/><path d="M8 14h8"/></svg></div>
+          <h3>Fine-tune the timing</h3>
+          <p>Off by a beat? Nudge subtitles with <code>[</code> and <code>]</code> (hold Shift for bigger steps) and reset with <code>\</code>. Works on any keyboard layout.</p>
         </div>
         <div class="feature-card reveal reveal-delay-3">
-          <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/></svg></div>
-          <h3>AI Summarization</h3>
-          <p>Get instant summaries of any video. Key points, main topics, and conclusions — all with one click.</p>
-          <span class="feature-tag">AI-powered</span>
+          <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></div>
+          <h3>Export SRT &amp; VTT</h3>
+          <p>Download any translation as a standard subtitle file for your video player, editor or your own uploads.</p>
         </div>
         <div class="feature-card reveal reveal-delay-4">
-          <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg></div>
-          <h3>Subtitle Overlay</h3>
-          <p>Display translated subtitles directly on the YouTube player in real-time as you watch.</p>
+          <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/></svg></div>
+          <h3>AI summaries</h3>
+          <p>Bullet points, a paragraph or key takeaways — in the language, tone and length you pick, with timestamps that jump to the moment.</p>
+        </div>
+        <div class="feature-card reveal reveal-delay-4">
+          <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg></div>
+          <h3>Local library</h3>
+          <p>Transcripts, translations and summaries are saved in your browser with tags, favorites and typo-tolerant search. Back up everything as JSON.</p>
         </div>
         <div class="feature-card reveal reveal-delay-5">
-          <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg></div>
-          <h3>Transcript Library</h3>
-          <p>All transcripts stored locally in IndexedDB. Favorites, tags, and full-text search. No cloud, no signup.</p>
-          <span class="feature-tag">IndexedDB</span>
-        </div>
-        <div class="feature-card reveal reveal-delay-5">
-          <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg></div>
-          <h3>Dashboard</h3>
-          <p>Full management UI with history, favorites, translations, statistics, and data export/import.</p>
-        </div>
-        <div class="feature-card reveal reveal-delay-6">
-          <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></div>
-          <h3>Cost Tracking</h3>
-          <p>See token usage and cost per translation. Know exactly what you're spending via OpenRouter's generation API.</p>
+          <div class="feature-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg></div>
+          <h3>Transparent &amp; resilient</h3>
+          <p>See the exact cost of every translation. Cancel any time — an interrupted translation picks up where it stopped instead of paying twice.</p>
         </div>
       </div>
     </div>
@@ -1127,25 +1174,25 @@
   <section id="install">
     <div class="section-container">
       <div class="reveal" style="text-align:center; margin-bottom: 4rem;">
-        <p class="section-label">// Get Started</p>
+        <p class="section-label">// Get started</p>
         <h2 class="section-title">Up and running in 3 steps</h2>
-        <p class="section-desc" style="margin-left:auto; margin-right:auto;">No build tools, no configuration. Install and start using it immediately.</p>
+        <p class="section-desc" style="margin-left:auto; margin-right:auto;">No build tools, no account with us. Install and translate your first video in a few minutes.</p>
       </div>
       <div class="steps">
         <div class="step reveal reveal-delay-1">
           <div class="step-number">1</div>
           <h3>Install Tampermonkey</h3>
-          <p>Get the <a href="https://www.tampermonkey.net/" target="_blank" rel="noopener">Tampermonkey</a> extension for Chrome, Firefox, Edge, or Safari.</p>
+          <p>Add the free <a href="https://www.tampermonkey.net/" target="_blank" rel="noopener">Tampermonkey</a> extension to Chrome, Edge, Firefox or a browser based on them.</p>
         </div>
         <div class="step reveal reveal-delay-2">
           <div class="step-number">2</div>
           <h3>Add SubScribe</h3>
-          <p>Click the install button above — Tampermonkey will detect and prompt you to install it automatically.</p>
+          <p>Click <a href="subscribe.user.js">Install</a> — Tampermonkey opens and asks you to confirm. Updates arrive automatically.</p>
         </div>
         <div class="step reveal reveal-delay-3">
           <div class="step-number">3</div>
-          <h3>Open YouTube</h3>
-          <p>New buttons appear on YouTube's interface. Extract, search, translate — all right there.</p>
+          <h3>Add a key, press Translate</h3>
+          <p>Paste an <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">OpenRouter API key</a> in settings, open any video with captions and press Translate.</p>
         </div>
       </div>
     </div>
@@ -1158,51 +1205,31 @@
     <div class="section-container">
       <div class="reveal">
         <p class="section-label">// Compatibility</p>
-        <h2 class="section-title">Works everywhere you watch</h2>
+        <h2 class="section-title">Works where you watch</h2>
       </div>
       <div class="browsers-grid reveal reveal-delay-1">
         <div class="browser-card">
-          <div class="browser-icon"><img src="https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/googlechrome.svg" alt="Chrome" width="48" height="48"></div>
-          <h4 class="browser-name">Chrome</h4>
-          <span class="browser-status"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="#22c55e" stroke-width="1.5"/><path d="M5 8.5l2 2 4-4" stroke="#22c55e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Supported</span>
+          <div class="browser-icon"><img src="https://cdn.jsdelivr.net/npm/simple-icons@16.36.0/icons/googlechrome.svg" alt="" width="48" height="48" loading="lazy"></div>
+          <h3 class="browser-name">Chrome</h3>
+          <span class="browser-status"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="7" stroke="#22c55e" stroke-width="1.5"/><path d="M5 8.5l2 2 4-4" stroke="#22c55e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Supported</span>
         </div>
         <div class="browser-card">
-          <div class="browser-icon"><img src="https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/firefox.svg" alt="Firefox" width="48" height="48"></div>
-          <h4 class="browser-name">Firefox</h4>
-          <span class="browser-status"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="#22c55e" stroke-width="1.5"/><path d="M5 8.5l2 2 4-4" stroke="#22c55e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Supported</span>
+          <div class="browser-icon"><img src="https://cdn.jsdelivr.net/npm/simple-icons@16.36.0/icons/firefox.svg" alt="" width="48" height="48" loading="lazy"></div>
+          <h3 class="browser-name">Firefox</h3>
+          <span class="browser-status"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="7" stroke="#22c55e" stroke-width="1.5"/><path d="M5 8.5l2 2 4-4" stroke="#22c55e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Supported</span>
         </div>
         <div class="browser-card">
-          <div class="browser-icon"><img src="https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/microsoftedge.svg" alt="Edge" width="48" height="48"></div>
-          <h4 class="browser-name">Edge</h4>
-          <span class="browser-status"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="#22c55e" stroke-width="1.5"/><path d="M5 8.5l2 2 4-4" stroke="#22c55e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Supported</span>
+          <div class="browser-icon"><img src="https://cdn.jsdelivr.net/npm/simple-icons@16.36.0/icons/microsoftedge.svg" alt="" width="48" height="48" loading="lazy"></div>
+          <h3 class="browser-name">Edge</h3>
+          <span class="browser-status"><svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="7" stroke="#22c55e" stroke-width="1.5"/><path d="M5 8.5l2 2 4-4" stroke="#22c55e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Supported</span>
         </div>
         <div class="browser-card">
-          <div class="browser-icon"><img src="https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/safari.svg" alt="Safari" width="48" height="48"></div>
-          <h4 class="browser-name">Safari</h4>
-          <span class="browser-status"><svg viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="#22c55e" stroke-width="1.5"/><path d="M5 8.5l2 2 4-4" stroke="#22c55e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Supported</span>
+          <div class="browser-icon"><img src="https://cdn.jsdelivr.net/npm/simple-icons@16.36.0/icons/safari.svg" alt="" width="48" height="48" loading="lazy"></div>
+          <h3 class="browser-name">Safari</h3>
+          <span class="browser-status untested">Not tested</span>
         </div>
       </div>
-    </div>
-  </section>
-
-  <div class="divider"></div>
-
-  <!-- ─── TECH STACK ─── -->
-  <section id="tech">
-    <div class="section-container">
-      <div class="reveal">
-        <p class="section-label">// Built With</p>
-        <h2 class="section-title">Tech Stack</h2>
-        <p class="section-desc">Modern tools, minimal footprint. The entire script bundles into a single file.</p>
-      </div>
-      <div class="tech-grid reveal reveal-delay-1">
-        <div class="tech-badge"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M1.125 0C.502 0 0 .502 0 1.125v21.75C0 23.498.502 24 1.125 24h21.75c.623 0 1.125-.502 1.125-1.125V1.125C24 .502 23.498 0 22.875 0H1.125zm17.363 9.75c.612 0 1.154.037 1.677.12a6.988 6.988 0 011.403.44v3.34a4.893 4.893 0 00-.788-.433 4.734 4.734 0 00-1.748-.35c-.405 0-.707.073-.907.217a.696.696 0 00-.3.586c0 .26.107.467.322.622.215.154.684.375 1.406.663.803.322 1.38.662 1.727 1.022.35.36.524.862.524 1.506 0 .937-.342 1.645-1.026 2.123-.684.478-1.6.717-2.747.717-.893 0-1.683-.132-2.37-.396v-3.473c.338.22.716.394 1.136.521.42.128.822.191 1.207.191.404 0 .7-.064.888-.192a.615.615 0 00.281-.535.693.693 0 00-.352-.607c-.235-.14-.743-.373-1.524-.7-.698-.291-1.226-.642-1.582-1.053-.357-.41-.535-.926-.535-1.546 0-.895.334-1.608 1-2.138.667-.53 1.56-.795 2.678-.795zM10.74 8.744h3.052v7.29c0 1.598-.353 2.774-1.058 3.529-.706.754-1.8 1.187-3.285 1.294l-.431-1.869c.762-.136 1.304-.416 1.628-.838.325-.422.488-1.076.488-1.963V8.744zM6.85 8.744h3.052v7.547H6.85V8.744z"/></svg> TypeScript</div>
-        <div class="tech-badge"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 1.608L3.804 6.3v9.384L12 20.392l8.196-4.708V6.3L12 1.608zM12 0l9.804 5.627v11.246L12 22.5 2.196 16.873V5.627L12 0z"/><path d="M12 5.627L7.608 8.16v5.064L12 15.76l4.392-2.536V8.16L12 5.627z"/></svg> esbuild <span class="tech-desc">— fast bundling</span></div>
-        <div class="tech-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Fuse.js <span class="tech-desc">— fuzzy search</span></div>
-        <div class="tech-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg> IndexedDB <span class="tech-desc">— local storage</span></div>
-        <div class="tech-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg> OpenRouter API <span class="tech-desc">— multi-model AI</span></div>
-        <div class="tech-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> Trusted Types <span class="tech-desc">— CSP compatible</span></div>
-      </div>
+      <p class="browser-note reveal">Browsers built on Chromium or Firefox (Brave, Vivaldi, Opera, Zen, LibreWolf…) work the same way.</p>
     </div>
   </section>
 
@@ -1217,25 +1244,55 @@
       </div>
       <div class="faq-list reveal reveal-delay-1">
         <div class="faq-item">
-          <button class="faq-trigger" aria-expanded="false"><span>Is my data safe?</span><svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
-          <div class="faq-content"><div class="faq-answer"><p>Yes. All transcripts are stored locally in your browser's IndexedDB. Nothing is sent to any server. Your data never leaves your machine.</p></div></div>
+          <button class="faq-trigger" aria-expanded="false"><span>What happens to my data?</span><svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></button>
+          <div class="faq-content"><div class="faq-answer"><p>Your library lives only in your browser (IndexedDB). There is no SubScribe server and no account. When you translate or summarize a video, its transcript is sent to OpenRouter and the AI model you chose, using your own API key. Nothing else leaves your browser.</p></div></div>
         </div>
         <div class="faq-item">
-          <button class="faq-trigger" aria-expanded="false"><span>Is it free?</span><svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
-          <div class="faq-content"><div class="faq-answer"><p>Completely free and open-source under the MIT license. The only potential cost is if you use AI translation or summarization via OpenRouter, which has its own pricing.</p></div></div>
+          <button class="faq-trigger" aria-expanded="false"><span>Is it free?</span><svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></button>
+          <div class="faq-content"><div class="faq-answer"><p>SubScribe itself is free and open source (MIT). AI features run on your own OpenRouter key, and OpenRouter charges per use depending on the model you pick. SubScribe shows the exact cost of every translation and summary.</p></div></div>
         </div>
         <div class="faq-item">
-          <button class="faq-trigger" aria-expanded="false"><span>Do I need an API key?</span><svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
-          <div class="faq-content"><div class="faq-answer"><p>Only for AI features (translation and summarization). Basic features like transcript extraction, search, and the library work without any API key. For AI features, you'll need a free OpenRouter API key.</p></div></div>
+          <button class="faq-trigger" aria-expanded="false"><span>Do I need an API key?</span><svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></button>
+          <div class="faq-content"><div class="faq-answer"><p>Only for translation and summaries. Saving transcripts, the library, search and export work without one.</p></div></div>
         </div>
         <div class="faq-item">
-          <button class="faq-trigger" aria-expanded="false"><span>Which browsers are supported?</span><svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
-          <div class="faq-content"><div class="faq-answer"><p>Any browser that supports Tampermonkey: Chrome, Firefox, Edge, and Safari. The userscript uses standard web APIs and works across all modern browsers.</p></div></div>
+          <button class="faq-trigger" aria-expanded="false"><span>How accurate is the subtitle timing?</span><svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></button>
+          <div class="faq-content"><div class="faq-answer"><p>The AI only translates; it never sets timing. SubScribe reads the caption data YouTube's player itself uses, which is precise to the millisecond, and maps every translated sentence back to it. If that data can't be read, it falls back to the transcript panel, which has whole-second timestamps. You can always nudge subtitles with <code>[</code> and <code>]</code>.</p></div></div>
         </div>
         <div class="faq-item">
-          <button class="faq-trigger" aria-expanded="false"><span>Can I export my transcripts?</span><svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button>
-          <div class="faq-content"><div class="faq-answer"><p>Yes. The dashboard has a full export/import feature. You can back up all your transcripts, favorites, tags, and translations as a JSON file.</p></div></div>
+          <button class="faq-trigger" aria-expanded="false"><span>Which languages are supported?</span><svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></button>
+          <div class="faq-content"><div class="faq-answer"><p>Any video that has captions on YouTube can be translated into 18 languages: Turkish, English, German, French, Spanish, Portuguese (Brazil), Italian, Dutch, Polish, Russian, Ukrainian, Arabic, Persian, Hindi, Indonesian, Japanese, Korean and Simplified Chinese.</p></div></div>
         </div>
+        <div class="faq-item">
+          <button class="faq-trigger" aria-expanded="false"><span>Which browsers are supported?</span><svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></button>
+          <div class="faq-content"><div class="faq-answer"><p>Chrome, Edge, Firefox and browsers built on them, with Tampermonkey installed. Safari with Tampermonkey may work but hasn't been tested.</p></div></div>
+        </div>
+        <div class="faq-item">
+          <button class="faq-trigger" aria-expanded="false"><span>Can I export my subtitles and data?</span><svg class="faq-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg></button>
+          <div class="faq-content"><div class="faq-answer"><p>Yes. Each translation can be downloaded as an SRT or VTT subtitle file, and the dashboard exports your whole library — transcripts, translations, summaries, tags and favorites — as a JSON backup you can import later.</p></div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="divider"></div>
+
+  <!-- ─── TECH STACK ─── -->
+  <section id="tech">
+    <div class="section-container">
+      <div class="reveal">
+        <p class="section-label">// Built with</p>
+        <h2 class="section-title">Tech stack</h2>
+        <p class="section-desc">Modern tools, minimal footprint. Everything bundles into a single userscript file.</p>
+      </div>
+      <div class="tech-grid reveal reveal-delay-1">
+        <div class="tech-badge">TypeScript</div>
+        <div class="tech-badge">esbuild <span class="tech-desc">— bundling</span></div>
+        <div class="tech-badge">OpenRouter API <span class="tech-desc">— multi-model AI</span></div>
+        <div class="tech-badge">IndexedDB <span class="tech-desc">— local storage</span></div>
+        <div class="tech-badge">Fuse.js <span class="tech-desc">— search</span></div>
+        <div class="tech-badge">DOMPurify + Trusted Types <span class="tech-desc">— safe HTML</span></div>
+        <div class="tech-badge">Bun <span class="tech-desc">— tests</span></div>
       </div>
     </div>
   </section>
@@ -1246,25 +1303,23 @@
   <section class="cta-section">
     <div class="section-container reveal">
       <p class="section-label">// Ready?</p>
-      <h2 class="section-title">Start managing your<br>YouTube transcripts today</h2>
-      <p class="section-desc">Free, open-source, and runs entirely in your browser. Your data stays yours.</p>
+      <h2 class="section-title">Watch anything,<br>in your language</h2>
+      <p class="section-desc">Free, open source and no account needed. Your library stays in your browser.</p>
       <div class="hero-actions" style="margin-top:2rem;">
         <a href="subscribe.user.js" class="btn btn-primary">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           Install SubScribe
         </a>
-        <a href="https://github.com/umitaltintas/subscribe" class="btn btn-ghost" target="_blank" rel="noopener">
-          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
-          View on GitHub
-        </a>
+        <a href="https://github.com/umitaltintas/subscribe" class="btn btn-ghost" target="_blank" rel="noopener">View on GitHub</a>
       </div>
     </div>
   </section>
+  </main>
 
   <!-- ─── FOOTER ─── -->
   <footer>
     <div class="footer-top">
-      <span>MIT License &copy; 2025 <a href="https://github.com/umitaltintas" target="_blank" rel="noopener">umitaltintas</a></span>
+      <span>MIT License &copy; 2025–2026 <a href="https://github.com/umitaltintas" target="_blank" rel="noopener">umitaltintas</a></span>
       <div class="footer-links">
         <a href="https://github.com/umitaltintas/subscribe" target="_blank" rel="noopener">GitHub</a>
         <a href="https://github.com/umitaltintas/subscribe/releases" target="_blank" rel="noopener">Releases</a>
@@ -1272,21 +1327,23 @@
       </div>
     </div>
     <div class="lang-selector" role="navigation" aria-label="Documentation languages">
-      <a class="lang-selector__link" href="https://github.com/umitaltintas/subscribe/blob/main/README.md" target="_blank" rel="noopener">&#127482;&#127480; English</a>
-      <a class="lang-selector__link" href="https://github.com/umitaltintas/subscribe/blob/main/docs/README.tr.md" target="_blank" rel="noopener">&#127481;&#127479; T&uuml;rk&ccedil;e</a>
-      <a class="lang-selector__link" href="https://github.com/umitaltintas/subscribe/blob/main/docs/README.de.md" target="_blank" rel="noopener">&#127465;&#127466; Deutsch</a>
-      <a class="lang-selector__link" href="https://github.com/umitaltintas/subscribe/blob/main/docs/README.es.md" target="_blank" rel="noopener">&#127466;&#127480; Espa&ntilde;ol</a>
-      <a class="lang-selector__link" href="https://github.com/umitaltintas/subscribe/blob/main/docs/README.ja.md" target="_blank" rel="noopener">&#127471;&#127477; &#26085;&#26412;&#35486;</a>
+      <a class="lang-selector__link" href="https://github.com/umitaltintas/subscribe/blob/main/README.md" target="_blank" rel="noopener" lang="en">&#127482;&#127480; English</a>
+      <a class="lang-selector__link" href="https://github.com/umitaltintas/subscribe/blob/main/docs/README.tr.md" target="_blank" rel="noopener" lang="tr">&#127481;&#127479; Türkçe</a>
+      <a class="lang-selector__link" href="https://github.com/umitaltintas/subscribe/blob/main/docs/README.de.md" target="_blank" rel="noopener" lang="de">&#127465;&#127466; Deutsch</a>
+      <a class="lang-selector__link" href="https://github.com/umitaltintas/subscribe/blob/main/docs/README.es.md" target="_blank" rel="noopener" lang="es">&#127466;&#127480; Español</a>
+      <a class="lang-selector__link" href="https://github.com/umitaltintas/subscribe/blob/main/docs/README.ja.md" target="_blank" rel="noopener" lang="ja">&#127471;&#127477; 日本語</a>
     </div>
   </footer>
 
   <!-- Back to top -->
   <button class="back-to-top" aria-label="Back to top">
-    <svg viewBox="0 0 24 24"><polyline points="18 15 12 9 6 15"/></svg>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="18 15 12 9 6 15"/></svg>
   </button>
 
   <!-- ─── SCRIPTS ─── -->
   <script>
+    const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
     // Scroll reveal
     const observer = new IntersectionObserver((entries) => {
       entries.forEach(entry => { if (entry.isIntersecting) entry.target.classList.add('visible'); });
@@ -1300,9 +1357,11 @@
     // Smooth scroll
     document.querySelectorAll('a[href^="#"]').forEach(a => {
       a.addEventListener('click', e => {
+        const href = a.getAttribute('href');
+        const t = href.length > 1 ? document.querySelector(href) : document.body;
+        if (!t) return;
         e.preventDefault();
-        const t = document.querySelector(a.getAttribute('href'));
-        if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        t.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'start' });
       });
     });
 
@@ -1311,27 +1370,38 @@
       const hamburger = document.querySelector('.hamburger');
       const mobileMenu = document.querySelector('.mobile-menu');
       const overlay = document.querySelector('.mobile-overlay');
-      function close() {
-        hamburger.classList.remove('active');
-        mobileMenu.classList.remove('active');
-        overlay.classList.remove('active');
-        hamburger.setAttribute('aria-expanded', 'false');
-        document.body.classList.remove('menu-open');
-      }
-      hamburger.addEventListener('click', () => {
-        const open = mobileMenu.classList.contains('active');
-        open ? close() : (hamburger.classList.add('active'), mobileMenu.classList.add('active'), overlay.classList.add('active'), hamburger.setAttribute('aria-expanded', 'true'), document.body.classList.add('menu-open'));
+      const setOpen = (open) => {
+        hamburger.classList.toggle('active', open);
+        mobileMenu.classList.toggle('active', open);
+        overlay.classList.toggle('active', open);
+        hamburger.setAttribute('aria-expanded', String(open));
+        hamburger.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+        mobileMenu.inert = !open;
+        document.body.classList.toggle('menu-open', open);
+        if (open) mobileMenu.querySelector('a').focus();
+      };
+      hamburger.addEventListener('click', () => setOpen(!mobileMenu.classList.contains('active')));
+      overlay.addEventListener('click', () => setOpen(false));
+      mobileMenu.querySelectorAll('a').forEach(l => l.addEventListener('click', () => setOpen(false)));
+      document.addEventListener('keydown', e => {
+        if (e.key === 'Escape' && mobileMenu.classList.contains('active')) { setOpen(false); hamburger.focus(); }
       });
-      overlay.addEventListener('click', close);
-      mobileMenu.querySelectorAll('a').forEach(l => l.addEventListener('click', close));
-      document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
     })();
 
     // Back to top
     (() => {
       const btn = document.querySelector('.back-to-top');
       window.addEventListener('scroll', () => { btn.classList.toggle('visible', window.scrollY > 400); }, { passive: true });
-      btn.addEventListener('click', () => { window.scrollTo({ top: 0, behavior: 'smooth' }); });
+      btn.addEventListener('click', () => { window.scrollTo({ top: 0, behavior: reducedMotion ? 'auto' : 'smooth' }); });
+    })();
+
+    // Version from the published userscript header (first KB is enough)
+    (() => {
+      const el = document.getElementById('hero-version');
+      fetch('subscribe.user.js', { headers: { Range: 'bytes=0-1023' }, cache: 'no-cache' })
+        .then(r => r.ok ? r.text() : '')
+        .then(t => { const m = /@version\s+(\S+)/.exec(t); if (m) el.textContent = 'v' + m[1]; })
+        .catch(() => {});
     })();
 
     // GitHub stars
@@ -1347,149 +1417,149 @@
       }).catch(() => {});
     })();
 
-    // Animated counters
+    // Animated counters (numbers are already in the HTML; this only animates them)
     (() => {
       const bar = document.getElementById('stats-bar');
-      if (!bar) return;
-      const nums = bar.querySelectorAll('.stats-bar__number');
-      let done = false;
-      function animate(el) {
-        const t = el.getAttribute('data-target'), s = el.getAttribute('data-suffix') || '';
-        if (t === 'infinity') { el.innerHTML = '&infin;'; return; }
-        const target = parseInt(t, 10);
-        if (target === 0) { el.textContent = '0'; return; }
+      if (!bar || reducedMotion) return;
+      const nums = bar.querySelectorAll('.stats-bar__number[data-target]');
+      const render = (el, n) => {
+        const s = el.dataset.suffix || '';
+        el.textContent = n;
+        if (s) { const span = document.createElement('span'); span.className = 'stats-pct'; span.textContent = s; el.appendChild(span); }
+      };
+      const animate = (el) => {
+        const target = parseInt(el.dataset.target, 10);
+        if (!target) return;
         const start = performance.now();
-        function step(now) {
-          const p = Math.min((now - start) / 1600, 1), ease = 1 - Math.pow(1 - p, 3);
-          el.textContent = Math.round(ease * target);
+        const step = (now) => {
+          const p = Math.min((now - start) / 1400, 1);
+          render(el, Math.round((1 - Math.pow(1 - p, 3)) * target));
           if (p < 1) requestAnimationFrame(step);
-          else if (s === '+') el.innerHTML = target + '<span class="stats-plus">+</span>';
-          else if (s === '%') el.innerHTML = target + '<span class="stats-pct">%</span>';
-          else el.textContent = target + s;
-        }
+        };
         requestAnimationFrame(step);
-      }
-      new IntersectionObserver(entries => {
-        entries.forEach(e => { if (e.isIntersecting && !done) { done = true; nums.forEach(animate); } });
-      }, { threshold: 0.3 }).observe(bar);
+      };
+      const io = new IntersectionObserver(entries => {
+        if (entries.some(e => e.isIntersecting)) { io.disconnect(); nums.forEach(animate); }
+      }, { threshold: 0.3 });
+      io.observe(bar);
     })();
 
     // FAQ accordion
     (() => {
       const items = document.querySelectorAll('.faq-item');
-      items.forEach(item => {
-        item.querySelector('.faq-trigger').addEventListener('click', () => {
+      items.forEach((item, i) => {
+        const trigger = item.querySelector('.faq-trigger');
+        const content = item.querySelector('.faq-content');
+        content.id = 'faq-answer-' + i;
+        trigger.setAttribute('aria-controls', content.id);
+        trigger.addEventListener('click', () => {
           const active = item.classList.contains('active');
           items.forEach(o => { o.classList.remove('active'); o.querySelector('.faq-trigger').setAttribute('aria-expanded', 'false'); o.querySelector('.faq-content').style.maxHeight = '0'; });
-          if (!active) { item.classList.add('active'); item.querySelector('.faq-trigger').setAttribute('aria-expanded', 'true'); const c = item.querySelector('.faq-content'); c.style.maxHeight = c.querySelector('.faq-answer').scrollHeight + 'px'; }
+          if (!active) { item.classList.add('active'); trigger.setAttribute('aria-expanded', 'true'); content.style.maxHeight = content.querySelector('.faq-answer').scrollHeight + 'px'; }
         });
       });
     })();
 
-    // Demo mockup animation
+    // Demo: caption lines → whole-sentence translation → synced subtitles → offset
     (() => {
-      const subtitleEl = document.getElementById('demoSubtitle');
-      if (!subtitleEl) return;
-      const subtitleText = subtitleEl.querySelector('.subtitle-text');
-      const subtitleLang = subtitleEl.querySelector('.subtitle-lang');
-      const searchInput = document.getElementById('demoSearch');
-      const transcriptList = document.getElementById('transcriptList');
-      const entries = transcriptList.querySelectorAll('.transcript-entry');
-      const btnTranscript = document.getElementById('btnTranscript');
-      const btnTranslate = document.getElementById('btnTranslate');
-      const tabTranscript = document.getElementById('tabTranscript');
-      const tabTranslation = document.getElementById('tabTranslation');
-      const statusText = document.getElementById('statusText');
-      const phaseSteps = document.querySelectorAll('.demo-section .phase-step');
+      const demo = document.querySelector('.demo-section');
+      if (!demo) return;
+      const $ = (id) => document.getElementById(id);
+      const sub = $('demoSubtitle'), subText = sub.querySelector('.subtitle-text'), subOrig = sub.querySelector('.subtitle-orig');
+      const osd = $('demoOsd'), osdText = $('demoOsdText'), key = $('demoKey');
+      const timeEl = $('demoTime'), progress = $('demoProgress'), status = $('statusText');
+      const DURATION = 12 * 60 + 7;
+      const setTime = (t) => {
+        const [m, s] = t.split(':').map(Number);
+        timeEl.textContent = t;
+        progress.style.width = ((m * 60 + s) / DURATION * 100).toFixed(2) + '%';
+      };
+      const listO = $('listOriginal'), listT = $('listTranslated');
+      const tabO = $('tabOriginal'), tabT = $('tabTranslation');
+      const btnTranscript = $('btnTranscript'), btnTranslate = $('btnTranslate');
+      const steps = demo.querySelectorAll('.phase-step');
+      const lines = [...listO.children], groups = [...listT.children];
+      const RANGES = [[0, 2], [3, 4], [5, 6]];
+      const textOf = (el) => el.querySelector('.entry-text').textContent;
+      const shortTime = (el) => el.querySelector('.entry-time').textContent.split('.')[0];
+      const originals = RANGES.map(([a, b]) => lines.slice(a, b + 1).map(textOf).join(' '));
 
-      const subs = [
-        { text: 'Each layer transforms the data, learning abstract representations.', lang: 'English' },
-        { text: 'Cada capa transforma los datos, aprendiendo representaciones abstractas.', lang: 'Espanol' },
-        { text: 'Chaque couche transforme les donnees en representations abstraites.', lang: 'Francais' },
-        { text: 'Jede Schicht transformiert die Daten und lernt abstrakte Darstellungen.', lang: 'Deutsch' },
-      ];
-      const origTexts = []; entries.forEach(e => origTexts.push(e.querySelector('.entry-text').innerHTML));
-      const DUR = 4000;
+      const wait = (ms) => new Promise(r => setTimeout(r, ms));
+      const setPhase = (p) => steps.forEach(s => s.classList.toggle('active', s.dataset.phase === p));
+      const setTab = (t) => {
+        tabO.classList.toggle('active', t === 'o'); tabT.classList.toggle('active', t === 't');
+        listO.hidden = t !== 'o'; listT.hidden = t !== 't';
+      };
+      const clearLines = () => lines.forEach(l => l.classList.remove('active', 'grouped'));
+      const showSubtitle = (i) => {
+        groups.forEach((g, j) => g.classList.toggle('active', i === j));
+        setTime(shortTime(groups[i]));
+        subText.textContent = textOf(groups[i]);
+        subOrig.textContent = originals[i];
+        sub.classList.add('visible');
+      };
 
-      function setPhase(n) { phaseSteps.forEach(s => s.classList.toggle('active', s.dataset.phase === n)); }
-      function reset() { entries.forEach((e,i) => { e.classList.remove('active','highlighted'); e.querySelector('.entry-text').innerHTML = origTexts[i]; e.style.opacity = ''; }); entries[1].classList.add('active'); }
-      function typeIn(el, text, spd, cb) { let i=0; el.value=''; (function t(){ if(i<text.length){el.value+=text[i];i++;setTimeout(t,spd);}else if(cb)cb(); })(); }
+      if (reducedMotion) {
+        setTab('t'); groups.forEach(g => g.classList.add('shown'));
+        setPhase('subtitles'); showSubtitle(0);
+        status.textContent = '3 sentences · Türkçe';
+        return;
+      }
 
-      function phase0() {
-        setPhase('extract'); reset();
-        btnTranscript.classList.add('active'); btnTranslate.classList.remove('active'); btnSummarize.classList.remove('active');
-        tabTranscript.classList.add('active'); tabTranslation.classList.remove('active');
-        searchInput.classList.remove('active'); searchInput.value='';
-        statusText.textContent='42 segments \u00b7 synced';
-        subtitleText.textContent=subs[0].text; subtitleLang.textContent=''; subtitleEl.classList.add('visible');
-        let idx=0; const iv=setInterval(()=>{ entries.forEach(e=>e.classList.remove('active')); if(idx<entries.length) entries[idx++].classList.add('active'); },500);
-        setTimeout(()=>{ clearInterval(iv); phase1(); }, DUR);
-      }
-      function phase1() {
-        setPhase('search'); reset(); subtitleEl.classList.remove('visible');
-        searchInput.classList.add('active'); statusText.textContent='searching...';
-        typeIn(searchInput,'backprop',120,()=>{
-          entries.forEach((e,i)=>{ const t=origTexts[i]; if(t.toLowerCase().includes('backprop')){ e.classList.add('highlighted'); e.querySelector('.entry-text').innerHTML=t.replace(/(backpropagation)/i,'<span class="fuzzy-match">$1</span>'); } else { e.style.opacity='0.35'; } });
-          statusText.textContent='1 match \u00b7 fuzzy';
-        });
-        setTimeout(()=>{ entries.forEach(e=>{e.style.opacity='';}); searchInput.classList.remove('active'); phase2(); }, DUR);
-      }
-      const btnSummarize = document.getElementById('btnSummarize');
+      async function loop() {
+        for (;;) {
+          // Reset
+          setTab('o'); clearLines(); sub.classList.remove('visible'); osd.classList.remove('visible');
+          groups.forEach(g => g.classList.remove('shown', 'active'));
+          btnTranslate.classList.remove('active');
 
-      function phase2() {
-        setPhase('translate'); reset(); searchInput.value='';
-        btnTranslate.classList.add('active'); btnSummarize.classList.remove('active'); tabTranscript.classList.remove('active'); tabTranslation.classList.add('active');
-        statusText.textContent='translating...';
-        const tr=['Una red neuronal es una serie de algoritmos que reconocen patrones.','Cada capa transforma los datos, aprendiendo representaciones abstractas.','El algoritmo de retropropagacion ajusta los pesos para minimizar errores.','El descenso de gradiente es como hacer rodar una pelota por una colina.','Las funciones de activacion introducen no linealidad.','Las capas convolucionales son potentes para reconocimiento de imagenes.','El dropout previene el sobreajuste durante el entrenamiento.'];
-        let i=0; const iv=setInterval(()=>{ if(i<entries.length){ const t=entries[i].querySelector('.entry-text'); t.style.transition='opacity 0.3s'; t.style.opacity='0'; const ci=i; setTimeout(()=>{t.textContent=tr[ci];t.style.opacity='1';},300); i++; } },350);
-        setTimeout(()=>{ statusText.textContent='42 segments \u00b7 ES'; },2800);
-        setTimeout(()=>{ clearInterval(iv); entries.forEach(e=>{const t=e.querySelector('.entry-text');t.style.transition='';t.style.opacity='';}); phaseSummarize(); }, DUR);
+          // 1. Caption lines with millisecond timing
+          setPhase('captions'); btnTranscript.classList.add('active');
+          status.textContent = '7 caption lines · ms timing';
+          for (const l of lines) { clearLines(); l.classList.add('active'); setTime(shortTime(l)); await wait(420); }
+          clearLines(); btnTranscript.classList.remove('active');
+          await wait(400);
+
+          // 2. Lines are grouped into whole sentences and translated
+          setPhase('translate'); btnTranslate.classList.add('active');
+          for (let i = 0; i < RANGES.length; i++) {
+            clearLines();
+            status.textContent = 'translating · sentence ' + (i + 1) + '/3';
+            for (let j = RANGES[i][0]; j <= RANGES[i][1]; j++) lines[j].classList.add('grouped');
+            await wait(1000);
+          }
+          clearLines(); setTab('t');
+          for (const g of groups) { g.classList.add('shown'); await wait(260); }
+          status.textContent = '3 sentences · Türkçe';
+          btnTranslate.classList.remove('active');
+          await wait(1100);
+
+          // 3. Subtitles follow the video, original underneath
+          setPhase('subtitles');
+          for (let i = 0; i < groups.length; i++) {
+            showSubtitle(i); await wait(2800);
+            sub.classList.remove('visible'); await wait(300);
+          }
+
+          // 4. Nudge timing with ]
+          setPhase('finetune'); showSubtitle(1);
+          for (let n = 1; n <= 3; n++) {
+            key.classList.add('pressed');
+            osdText.textContent = 'Subtitles +0.' + n + ' s';
+            osd.classList.add('visible');
+            status.textContent = 'offset +0.' + n + ' s';
+            await wait(160); key.classList.remove('pressed'); await wait(480);
+          }
+          await wait(1600);
+          osd.classList.remove('visible'); sub.classList.remove('visible');
+          await wait(800);
+        }
       }
-      function phaseSummarize() {
-        setPhase('summarize'); reset(); searchInput.value='';
-        btnTranslate.classList.remove('active'); btnSummarize.classList.add('active');
-        tabTranscript.classList.add('active'); tabTranslation.classList.remove('active');
-        statusText.textContent='summarizing...';
-        subtitleEl.classList.remove('visible');
-        const summaryLines = [
-          {bold: true, text: 'Main Topic'},
-          {bold: false, text: 'A visual introduction to neural networks and deep learning fundamentals.'},
-          {bold: true, text: 'Key Points'},
-          {bold: false, text: '\u2022 Neural networks recognize patterns through layered data transformation'},
-          {bold: false, text: '\u2022 Backpropagation minimizes prediction errors via gradient descent'},
-          {bold: false, text: '\u2022 CNNs excel at image recognition; dropout prevents overfitting'},
-        ];
-        entries.forEach(e => { e.style.transition='opacity 0.3s'; e.style.opacity='0'; });
-        setTimeout(()=>{
-          entries.forEach((e,i) => {
-            if (i < summaryLines.length) {
-              const t = e.querySelector('.entry-text');
-              const tm = e.querySelector('.entry-time');
-              tm.textContent = summaryLines[i].bold ? '\u2728' : '';
-              t.innerHTML = summaryLines[i].bold ? '<strong style="color:var(--red)">' + summaryLines[i].text + '</strong>' : summaryLines[i].text;
-              e.style.opacity = '1';
-              e.classList.remove('active');
-            } else { e.style.display = 'none'; }
-          });
-          statusText.textContent='summary ready \u00b7 AI';
-        }, 500);
-        setTimeout(()=>{ entries.forEach(e=>{e.style.transition='';e.style.opacity='';e.style.display='';}); btnSummarize.classList.remove('active'); phase3(); }, DUR);
-      }
-      function phase3() {
-        setPhase('overlay'); reset(); searchInput.value='';
-        tabTranscript.classList.add('active'); tabTranslation.classList.remove('active');
-        btnTranslate.classList.remove('active'); statusText.textContent='42 segments \u00b7 synced';
-        let si=0;
-        function showSub(){ subtitleEl.classList.remove('visible'); setTimeout(()=>{ subtitleText.textContent=subs[si].text; subtitleLang.textContent=subs[si].lang; subtitleEl.classList.add('visible'); si=(si+1)%subs.length; },400); }
-        showSub(); const iv=setInterval(showSub,2200);
-        let ei=0; const eiv=setInterval(()=>{ entries.forEach(e=>e.classList.remove('active')); entries[ei%entries.length].classList.add('active'); ei++; },1800);
-        setTimeout(()=>{ clearInterval(iv); clearInterval(eiv); subtitleEl.classList.remove('visible'); setTimeout(phase0,600); }, DUR*2);
-      }
-      // Start on visibility
-      const demoObs = new IntersectionObserver(entries2 => {
-        if (entries2[0].isIntersecting) { demoObs.disconnect(); setTimeout(phase0, 800); }
+
+      const start = new IntersectionObserver(entries => {
+        if (entries[0].isIntersecting) { start.disconnect(); setTimeout(loop, 600); }
       }, { threshold: 0.2 });
-      demoObs.observe(document.querySelector('.demo-section'));
+      start.observe(demo);
     })();
   </script>
 </body>

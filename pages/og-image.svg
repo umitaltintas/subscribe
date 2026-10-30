@@ -1,4 +1,3 @@
-<!-- Add to HTML head: <meta property="og:image" content="https://umitaltintas.github.io/subscribe/og-image.svg"> -->
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
   <defs>
     <linearGradient id="brandGrad" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -58,13 +57,13 @@
   <rect x="350" y="370" width="500" height="3" rx="2" fill="url(#accentLine)"/>
 
   <!-- Subtitle -->
-  <text x="600" y="425" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="30" fill="#888888" letter-spacing="4">
-    YouTube Transcript Manager
+  <text x="600" y="425" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="30" fill="#888888" letter-spacing="1">
+    Any YouTube video, in your language
   </text>
 
   <!-- Feature list -->
   <text x="600" y="490" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="20" fill="#666666" letter-spacing="3">
-    Extract &#x2022; Search &#x2022; Translate &#x2022; Overlay
+    Sentence-level AI translation &#x2022; Millisecond-synced subtitles
   </text>
 
   <!-- Userscript badge -->
